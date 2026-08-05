@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作日志</title>
+<style>
+  :root{
+    --bg:#100f0d;
+    --paper:#1c1a16;
+    --paper-2:#221f1a;
+    --ink:#f2ece0;
+    --ink-dim:#9c9384;
+    --line:rgba(242,236,224,0.09);
+    --accent:#ff7a1a;
+    --accent-dim:rgba(255,122,26,0.16);
+    --half:#e0b34c;
+    --half-dim:rgba(224,179,76,0.16);
+    --rest:#5b6b5a;
+    --rest-dim:rgba(91,107,90,0.18);
+    --money:#8fae7f;
+    --danger:#e05c5c;
+    --radius:14px;
+    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:#0a0908;
+    font-family:var(--font);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    background:var(--bg);
+    position:relative;
+    padding-bottom:100px;
+  }
+
+  /* ===== 顶部 ===== */
+  .topbar{ padding:22px 20px 6px; }
+  .topbar h1{ font-size:21px; font-weight:700; margin:0 0 2px; letter-spacing:-0.01em; }
+  .topbar .sub{ font-size:12.5px; color:var(--ink-dim); }
+
+  /* ===== 周导航 + 本周合计 ===== */
+  .week-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin:16px 20px 0;
+  }
+  .nav-btn{
+    width:34px;height:34px;
+    border-radius:50%;
+    background:var(--paper);
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+    font-size:16px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .nav-btn:active{ background:var(--paper-2); }
+  .week-range{ font-size:13px; color:var(--ink-dim); text-align:center; flex:1; }
+  .today-btn{
+    font-size:11.5px;
+    color:var(--accent);
+    padding:5px 10px;
+    border-radius:8px;
+    background:var(--accent-dim);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .summary{
+    margin:12px 20px 6px;
+    background:var(--paper);
+    border-radius:var(--radius);
+    padding:18px 18px 16px;
+    border:1px solid var(--line);
+  }
+  .summary-top{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
+  .summary-label{ font-size:12.5px; color:var(--ink-dim); letter-spacing:0.02em; }
+  .summary-total{ font-size:30px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--accent); }
+  .summary-total span{ font-size:14px; font-weight:500; color:var(--ink-dim); margin-left:2px; }
+  .tally{ display:flex; gap:5px; align-items:flex-end; height:46px; }
+  .tally-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; }
+  .tally-bar-track{ width:100%; height:34px; border-radius:5px; background:rgba(255,255,255,0.05); display:flex; align-items:flex-end; overflow:hidden; }
+  .tally-bar{ width:100%; border-radius:5px; transition:height .15s ease; }
+  .tally-day{ font-size:10.5px; color:var(--ink-dim); }
+  .tally-col.is-today .tally-day{ color:var(--accent); font-weight:700; }
+
+  .section-title{ margin:22px 20px 8px; font-size:12px; color:var(--ink-dim); letter-spacing:0.04em; }
+
+  /* ===== 日志条目 ===== */
+  .entries{ padding:0 20px; display:flex; flex-direction:column; gap:10px; }
+  .entry{
+    display:flex;
+    background:var(--paper);
+    border-radius:var(--radius);
+    border:1px solid var(--line);
+    overflow:hidden;
+    cursor:pointer;
+  }
+  .entry:active{ background:var(--paper-2); }
+  .entry-tick{ width:5px; flex-shrink:0; }
+  .entry-tick.full{ background:var(--accent); }
+  .entry-tick.half{ background:var(--half); }
+  .entry-tick.rest{ background:var(--rest); }
+  .entry-tick.empty{ background:transparent; }
+
+  .entry-body{ flex:1; padding:14px 16px; min-width:0; }
+  .entry-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .entry-date{ font-size:14.5px; font-weight:700; }
+  .entry-date .week{ font-size:12px; font-weight:500; color:var(--ink-dim); margin-left:6px; }
+  .day-badge{ font-size:11px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .day-badge.full{ background:var(--accent-dim); color:var(--accent); }
+  .day-badge.half{ background:var(--half-dim); color:var(--half); }
+  .day-badge.rest{ background:var(--rest-dim); color:#9fb09d; }
+  .day-badge.empty{ background:rgba(255,255,255,0.05); color:var(--ink-dim); }
+
+  .entry-content{ font-size:13.5px; color:var(--ink); line-height:1.5; margin-bottom:8px; }
+  .entry-content.muted{ color:var(--ink-dim); }
+
+  .chip-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .chip{ font-size:12px; padding:4px 10px; border-radius:8px; background:rgba(255,255,255,0.08); color:var(--ink); }
+
+  .extra-row{ display:flex; flex-wrap:wrap; gap:12px; font-size:12.5px; color:var(--money); padding-top:8px; border-top:1px dashed var(--line); }
+  .extra-row .item{ display:flex; gap:4px; align-items:baseline; }
+  .extra-row .label{ color:var(--ink-dim); }
+
+  .fab{
+    position:fixed;
+    right:calc(50% - 240px + 20px);
+    bottom:26px;
+    width:54px;height:54px;
+    border-radius:50%;
+    background:var(--accent);
+    color:#1a0e00;
+    display:flex;align-items:center;justify-content:center;
+    font-size:26px;font-weight:700;
+    box-shadow:0 10px 26px rgba(255,122,26,0.4);
+    border:none;
+    cursor:pointer;
+    z-index:20;
+  }
+  @media (max-width:480px){
+    .fab{ right:20px; }
+  }
+
+  /* ===== 编辑弹层 ===== */
+  .sheet-backdrop{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.55);
+    display:none;
+    z-index:50;
+    align-items:flex-end;
+  }
+  .sheet-backdrop.open{ display:flex; }
+  .sheet{
+    width:100%;
+    max-width:480px;
+    margin:0 auto;
+    background:var(--bg);
+    border-radius:20px 20px 0 0;
+    max-height:88vh;
+    overflow-y:auto;
+    padding:18px 20px 28px;
+  }
+  .sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .sheet-head h2{ font-size:16px; margin:0; }
+  .sheet-close{ font-size:14px; color:var(--ink-dim); cursor:pointer; padding:4px 8px; }
+
+  .field-label{ font-size:11.5px; color:var(--ink-dim); margin:16px 0 7px; }
+  .field-label:first-child{ margin-top:0; }
+
+  .type-row{ display:flex; gap:8px; }
+  .type-btn{
+    flex:1;
+    text-align:center;
+    padding:10px 0;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink-dim);
+    font-size:13px;
+    cursor:pointer;
+  }
+  .type-btn.active.full{ background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+  .type-btn.active.half{ background:var(--half-dim); color:var(--half); border-color:var(--half); }
+  .type-btn.active.rest{ background:var(--rest-dim); color:#9fb09d; border-color:var(--rest); }
+
+  .overtime-toggle{
+    margin-top:10px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px;
+    border-radius:10px;
+    background:var(--paper);
+    border:1px solid var(--line);
+  }
+  .overtime-toggle .lbl{ font-size:13px; color:var(--ink); }
+  .switch{
+    width:42px; height:24px; border-radius:999px;
+    background:rgba(255,255,255,0.12);
+    position:relative;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .switch.on{ background:var(--accent); }
+  .switch .knob{
+    position:absolute; top:2px; left:2px;
+    width:20px; height:20px; border-radius:50%;
+    background:#fff;
+    transition:left .15s ease;
+  }
+  .switch.on .knob{ left:20px; }
+
+  .tag-input-wrap{
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    align-items:center;
+  }
+  .tag-input-wrap input{
+    flex:1;
+    min-width:80px;
+    border:none;
+    background:transparent;
+    outline:none;
+    color:var(--ink);
+    font-size:13.5px;
+    padding:4px 2px;
+    font-family:var(--font);
+  }
+  .tag-input-wrap input::placeholder{ color:#686155; }
+  .tag-chip{
+    display:flex; align-items:center; gap:5px;
+    font-size:12.5px;
+    padding:5px 6px 5px 10px;
+    border-radius:8px;
+    background:rgba(255,122,26,0.14);
+    color:var(--accent);
+  }
+  .tag-chip .rm{ cursor:pointer; opacity:.8; padding:0 3px; }
+
+  .suggest-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .suggest-chip{
+    font-size:12px; padding:5px 11px; border-radius:8px;
+    background:rgba(255,255,255,0.06);
+    color:var(--ink-dim);
+    border:1px solid var(--line);
+    cursor:pointer;
+  }
+  .suggest-chip:active{ background:rgba(255,255,255,0.12); }
+
+  .purchase-row{
+    display:flex; gap:8px; align-items:center;
+    margin-bottom:8px;
+  }
+  .purchase-row input[type=text]{
+    flex:1.3;
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:9px 11px;
+    font-size:13px;
+    color:var(--ink);
+    outline:none;
+    font-family:var(--font);
+  }
+  .purchase-row input[type=number]{
+    flex:1;
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:9px 11px;
+    font-size:13px;
+    color:var(--ink);
+    outline:none;
+    font-family:var(--font);
+  }
+  .purchase-row .rm-row{
+    color:var(--ink-dim);
+    font-size:16px;
+    padding:0 4px;
+    cursor:pointer;
+  }
+  .add-purchase-row{
+    display:flex; gap:8px; margin-top:4px;
+  }
+  .add-purchase-btn{
+    font-size:12px;
+    padding:6px 12px;
+    border-radius:8px;
+    background:rgba(255,255,255,0.06);
+    color:var(--ink-dim);
+    border:1px solid var(--line);
+    cursor:pointer;
+  }
+
+  .sheet-actions{
+    display:flex; gap:10px; margin-top:22px;
+  }
+  .btn{
+    flex:1;
+    text-align:center;
+    padding:12px 0;
+    border-radius:12px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    border:none;
+  }
+  .btn.save{ background:var(--accent); color:#1a0e00; }
+  .btn.delete{ background:rgba(224,92,92,0.14); color:var(--danger); flex:0.6; }
+
+  .empty-hint{
+    text-align:center;
+    padding:40px 20px;
+    color:var(--ink-dim);
+    font-size:13px;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="topbar">
+    <h1>工作日志</h1>
+    <div class="sub">按日期记录 · 自动核算出勤</div>
+  </div>
+
+  <div class="week-nav">
+    <div class="nav-btn" id="prevWeekBtn">‹</div>
+    <div class="week-range" id="weekRangeLabel"></div>
+    <div class="nav-btn" id="nextWeekBtn">›</div>
+  </div>
+
+  <div class="summary">
+    <div class="summary-top">
+      <div class="summary-label" id="summaryLabel">本周合计</div>
+      <div class="summary-total" id="summaryTotal">0<span>天</span></div>
+    </div>
+    <div class="tally" id="tally"></div>
+  </div>
+
+  <div class="section-title" id="sectionTitle"></div>
+  <div class="entries" id="entries"></div>
+
+  <button class="fab" id="fabBtn">+</button>
+</div>
+
+<div class="sheet-backdrop" id="sheetBackdrop">
+  <div class="sheet" id="sheet">
+    <div class="sheet-head">
+      <h2 id="sheetDate">编辑记录</h2>
+      <div class="sheet-close" id="sheetClose">关闭</div>
+    </div>
+
+    <div class="field-label">出勤类型</div>
+    <div class="type-row" id="typeRow">
+      <div class="type-btn full" data-type="full">整天</div>
+      <div class="type-btn half" data-type="half">半天</div>
+      <div class="type-btn rest" data-type="rest">休息</div>
+    </div>
+    <div class="overtime-toggle">
+      <div class="lbl">加班（额外 +0.5 天）</div>
+      <div class="switch" id="overtimeSwitch"><div class="knob"></div></div>
+    </div>
+
+    <div class="field-label">工作内容</div>
+    <div class="tag-input-wrap" id="contentTagWrap">
+      <input type="text" id="contentInput" placeholder="输入后按回车添加">
+    </div>
+    <div class="suggest-row" id="contentSuggest"></div>
+
+    <div class="field-label">工作人员</div>
+    <div class="tag-input-wrap" id="workerTagWrap">
+      <input type="text" id="workerInput" placeholder="输入后按回车添加">
+    </div>
+    <div class="suggest-row" id="workerSuggest"></div>
+
+    <div class="field-label">买饭 / 买材料 等额外花销</div>
+    <div id="purchaseRows"></div>
+    <div class="add-purchase-row">
+      <div class="add-purchase-btn" data-preset="买饭">+ 买饭</div>
+      <div class="add-purchase-btn" data-preset="买材料">+ 买材料</div>
+      <div class="add-purchase-btn" data-preset="">+ 其他</div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn delete" id="deleteBtn">删除</button>
+      <button class="btn save" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ============================================================
+  // Config & Storage
+  // ============================================================
+  const STORAGE_KEY = 'worklog_entries_v1';
+
+  const Storage = {
+    loadAll(){
+      try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+      catch(e){ return {}; }
+    },
+    saveAll(map){
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(map)); }catch(e){ /* ignore quota errors */ }
+    },
+    get(dateStr){ return this.loadAll()[dateStr] || null; },
+    set(dateStr, entry){
+      const all = this.loadAll();
+      all[dateStr] = entry;
+      this.saveAll(all);
+    },
+    remove(dateStr){
+      const all = this.loadAll();
+      delete all[dateStr];
+      this.saveAll(all);
+    },
+    // 历史建议：从所有已存在的记录里提取出现过的内容/人员/花销名目，按出现频率排序
+    historyOf(field){
+      const all = this.loadAll();
+      const counts = {};
+      Object.values(all).forEach(entry => {
+        const list = field === 'purchaseLabels'
+          ? (entry.purchases || []).map(p => p.label).filter(Boolean)
+          : (entry[field] || []);
+        list.forEach(v => { counts[v] = (counts[v]||0) + 1; });
+      });
+      return Object.keys(counts).sort((a,b) => counts[b]-counts[a]);
+    }
+  };
+
+  // ============================================================
+  // Date utils
+  // ============================================================
+  const Utils = {
+    pad(n){ return String(n).padStart(2,'0'); },
+    fmt(date){ return date.getFullYear()+'-'+this.pad(date.getMonth()+1)+'-'+this.pad(date.getDate()); },
+    parse(str){ const [y,m,d] = str.split('-').map(Number); return new Date(y, m-1, d); },
+    todayStr(){ return this.fmt(new Date()); },
+    addDays(date, n){ const d = new Date(date); d.setDate(d.getDate()+n); return d; },
+    // 本周周一作为起点
+    weekStart(date){
+      const d = new Date(date);
+      const dow = d.getDay(); // 0=周日...6=周六
+      const diff = dow === 0 ? -6 : 1 - dow; // 周一为一周开始
+      return this.addDays(d, diff);
+    },
+    weekdayLabel(date){ return ['日','一','二','三','四','五','六'][date.getDay()]; },
+    monthDayLabel(date){ return (date.getMonth()+1)+'月'+date.getDate()+'日'; },
+    shortLabel(date){ return (date.getMonth()+1)+'/'+date.getDate(); }
+  };
+
+  // ============================================================
+  // 出勤天数计算
+  // ============================================================
+  function dayCount(entry){
+    if(!entry) return 0;
+    let base = entry.type === 'full' ? 1 : entry.type === 'half' ? 0.5 : 0;
+    if(entry.overtime) base += 0.5;
+    return base;
+  }
+  function fmtDay(n){
+    // 去掉多余小数位：1 -> "1"，1.5 -> "1.5"
+    return (Math.round(n*10)/10).toString();
+  }
+
+  // ============================================================
+  // 状态
+  // ============================================================
+  let currentWeekStart = Utils.weekStart(new Date());
+  let editingDate = null; // 当前编辑的日期字符串
+  let draft = null;       // 编辑中的草稿数据
+
+  // ============================================================
+  // 渲染：周视图
+  // ============================================================
+  const weekRangeLabel = document.getElementById('weekRangeLabel');
+  const summaryLabel = document.getElementById('summaryLabel');
+  const summaryTotal = document.getElementById('summaryTotal');
+  const tallyEl = document.getElementById('tally');
+  const sectionTitle = document.getElementById('sectionTitle');
+  const entriesEl = document.getElementById('entries');
+
+  function getWeekDates(weekStart){
+    return Array.from({length:7}, (_,i) => Utils.addDays(weekStart, i));
+  }
+
+  function render(){
+    const dates = getWeekDates(currentWeekStart);
+    const weekEnd = dates[6];
+    const today = Utils.todayStr();
+
+    weekRangeLabel.textContent = `${Utils.shortLabel(dates[0])} 一 – ${Utils.shortLabel(weekEnd)} 日`;
+
+    const isThisWeek = Utils.fmt(Utils.weekStart(new Date())) === Utils.fmt(currentWeekStart);
+    summaryLabel.textContent = isThisWeek ? '本周合计' : '当周合计';
+
+    let total = 0;
+    tallyEl.innerHTML = dates.map(d => {
+      const ds = Utils.fmt(d);
+      const entry = Storage.get(ds);
+      const count = dayCount(entry);
+      total += count;
+      const pct = Math.min(count, 1.5) / 1.5 * 100;
+      const color = !entry ? 'rgba(255,255,255,0.08)' : entry.type === 'rest' ? 'var(--rest)' : entry.type === 'half' ? 'var(--half)' : 'var(--accent)';
+      const isToday = ds === today ? ' is-today' : '';
+      return `
+        <div class="tally-col${isToday}" data-date="${ds}">
+          <div class="tally-bar-track"><div class="tally-bar" style="height:${pct}%;background:${color};"></div></div>
+          <div class="tally-day">${Utils.weekdayLabel(d)}</div>
+        </div>`;
+    }).join('');
+    summaryTotal.innerHTML = `${fmtDay(total)}<span>天</span>`;
+
+    sectionTitle.textContent = `${Utils.monthDayLabel(dates[0])} — ${Utils.monthDayLabel(weekEnd)}`;
+
+    entriesEl.innerHTML = dates.map(d => renderEntryCard(d)).join('');
+  }
+
+  function renderEntryCard(date){
+    const ds = Utils.fmt(date);
+    const entry = Storage.get(ds);
+    const weekday = Utils.weekdayLabel(date);
+    const dateLabel = Utils.monthDayLabel(date);
+
+    if(!entry){
+      return `
+        <div class="entry" data-date="${ds}">
+          <div class="entry-tick empty"></div>
+          <div class="entry-body">
+            <div class="entry-head">
+              <div class="entry-date">${dateLabel}<span class="week">周${weekday}</span></div>
+              <div class="day-badge empty">+ 添加</div>
+            </div>
+            <div class="entry-content muted">今日无记录</div>
+          </div>
+        </div>`;
+    }
+
+    const typeLabel = entry.type === 'full' ? '整天' : entry.type === 'half' ? '半天' : '休息';
+    const badgeText = entry.overtime ? `${typeLabel} +0.5` : typeLabel;
+    const contentHtml = (entry.contents && entry.contents.length)
+      ? `<div class="entry-content">${entry.contents.map(escapeHtml).join('，')}</div>`
+      : (entry.type === 'rest' ? '' : `<div class="entry-content muted">未填写工作内容</div>`);
+    const workersHtml = (entry.workers && entry.workers.length)
+      ? `<div class="chip-row">${entry.workers.map(w => `<div class="chip">${escapeHtml(w)}</div>`).join('')}</div>`
+      : '';
+    const purchases = entry.purchases || [];
+    const purchaseHtml = purchases.length
+      ? `<div class="extra-row">${purchases.map(p => `<div class="item"><span class="label">${escapeHtml(p.label||'花销')}</span> ¥${p.amount}</div>`).join('')}</div>`
+      : '';
+
+    return `
+      <div class="entry" data-date="${ds}">
+        <div class="entry-tick ${entry.type}"></div>
+        <div class="entry-body">
+          <div class="entry-head">
+            <div class="entry-date">${dateLabel}<span class="week">周${weekday}</span></div>
+            <div class="day-badge ${entry.type}">${badgeText}</div>
+          </div>
+          ${contentHtml}
+          ${workersHtml}
+          ${purchaseHtml}
+        </div>
+      </div>`;
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+  }
+
+  // ============================================================
+  // 周导航
+  // ============================================================
+  document.getElementById('prevWeekBtn').addEventListener('click', () => {
+    currentWeekStart = Utils.addDays(currentWeekStart, -7);
+    render();
+  });
+  document.getElementById('nextWeekBtn').addEventListener('click', () => {
+    currentWeekStart = Utils.addDays(currentWeekStart, 7);
+    render();
+  });
+  tallyEl.addEventListener('click', (e) => {
+    const col = e.target.closest('.tally-col');
+    if(col) openEditor(col.dataset.date);
+  });
+
+  // ============================================================
+  // 条目点击 → 打开编辑
+  // ============================================================
+  entriesEl.addEventListener('click', (e) => {
+    const card = e.target.closest('.entry');
+    if(card) openEditor(card.dataset.date);
+  });
+
+  document.getElementById('fabBtn').addEventListener('click', () => {
+    openEditor(Utils.todayStr());
+  });
+
+  // ============================================================
+  // 编辑弹层
+  // ============================================================
+  const sheetBackdrop = document.getElementById('sheetBackdrop');
+  const sheetDate = document.getElementById('sheetDate');
+  const typeRow = document.getElementById('typeRow');
+  const overtimeSwitch = document.getElementById('overtimeSwitch');
+  const contentTagWrap = document.getElementById('contentTagWrap');
+  const contentInput = document.getElementById('contentInput');
+  const contentSuggest = document.getElementById('contentSuggest');
+  const workerTagWrap = document.getElementById('workerTagWrap');
+  const workerInput = document.getElementById('workerInput');
+  const workerSuggest = document.getElementById('workerSuggest');
+  const purchaseRowsEl = document.getElementById('purchaseRows');
+  const deleteBtn = document.getElementById('deleteBtn');
+  const saveBtn = document.getElementById('saveBtn');
+
+  function openEditor(dateStr){
+    editingDate = dateStr;
+    const existing = Storage.get(dateStr);
+    draft = existing ? JSON.parse(JSON.stringify(existing)) : {
+      type: 'full', overtime: false, contents: [], workers: [], purchases: []
+    };
+
+    const d = Utils.parse(dateStr);
+    sheetDate.textContent = `${Utils.monthDayLabel(d)} 周${Utils.weekdayLabel(d)}`;
+    deleteBtn.style.display = existing ? 'block' : 'none';
+
+    renderSheet();
+    sheetBackdrop.classList.add('open');
+  }
+
+  function closeEditor(){
+    sheetBackdrop.classList.remove('open');
+    editingDate = null;
+    draft = null;
+  }
+  document.getElementById('sheetClose').addEventListener('click', closeEditor);
+  sheetBackdrop.addEventListener('click', (e) => { if(e.target === sheetBackdrop) closeEditor(); });
+
+  function renderSheet(){
+    // 出勤类型按钮状态
+    typeRow.querySelectorAll('.type-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.type === draft.type);
+    });
+    // 加班开关
+    overtimeSwitch.classList.toggle('on', !!draft.overtime);
+
+    renderTags(contentTagWrap, contentInput, draft.contents);
+    renderTags(workerTagWrap, workerInput, draft.workers);
+    renderSuggestions(contentSuggest, Storage.historyOf('contents'), draft.contents, (val) => {
+      draft.contents.push(val); renderSheet();
+    });
+    renderSuggestions(workerSuggest, Storage.historyOf('workers'), draft.workers, (val) => {
+      draft.workers.push(val); renderSheet();
+    });
+    renderPurchaseRows();
+  }
+
+  function renderTags(wrapEl, inputEl, list){
+    wrapEl.querySelectorAll('.tag-chip').forEach(el => el.remove());
+    list.forEach((val, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `<span>${escapeHtml(val)}</span><span class="rm" data-idx="${idx}">✕</span>`;
+      wrapEl.insertBefore(chip, inputEl);
+    });
+  }
+
+  function renderSuggestions(container, history, currentList, onPick){
+    const remaining = history.filter(v => !currentList.includes(v)).slice(0, 8);
+    container.innerHTML = remaining.map(v => `<div class="suggest-chip" data-val="${escapeHtml(v)}">${escapeHtml(v)}</div>`).join('');
+    container.querySelectorAll('.suggest-chip').forEach(chip => {
+      chip.addEventListener('click', () => onPick(chip.dataset.val));
+    });
+  }
+
+  contentTagWrap.addEventListener('click', (e) => {
+    const rm = e.target.closest('.rm');
+    if(rm){ draft.contents.splice(Number(rm.dataset.idx), 1); renderSheet(); }
+  });
+  workerTagWrap.addEventListener('click', (e) => {
+    const rm = e.target.closest('.rm');
+    if(rm){ draft.workers.splice(Number(rm.dataset.idx), 1); renderSheet(); }
+  });
+
+  function addFromInput(inputEl, list){
+    const val = inputEl.value.trim();
+    if(val && !list.includes(val)){
+      list.push(val);
+      inputEl.value = '';
+      renderSheet();
+      // renderSheet 会重建 DOM，重新聚焦
+      const newInput = inputEl === contentInput ? contentInput : workerInput;
+      newInput.focus();
+    }else{
+      inputEl.value = '';
+    }
+  }
+  contentInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); addFromInput(contentInput, draft.contents); }
+  });
+  workerInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); addFromInput(workerInput, draft.workers); }
+  });
+  // 移动端很多用户不会按回车，失焦时也自动加入
+  contentInput.addEventListener('blur', () => { if(contentInput.value.trim()) addFromInput(contentInput, draft.contents); });
+  workerInput.addEventListener('blur', () => { if(workerInput.value.trim()) addFromInput(workerInput, draft.workers); });
+
+  // 出勤类型 / 加班
+  typeRow.addEventListener('click', (e) => {
+    const btn = e.target.closest('.type-btn');
+    if(btn){ draft.type = btn.dataset.type; renderSheet(); }
+  });
+  overtimeSwitch.addEventListener('click', () => {
+    draft.overtime = !draft.overtime;
+    renderSheet();
+  });
+
+  // 花销行
+  function renderPurchaseRows(){
+    purchaseRowsEl.innerHTML = draft.purchases.map((p, idx) => `
+      <div class="purchase-row" data-idx="${idx}">
+        <input type="text" class="p-label" placeholder="名目，如买饭" value="${escapeHtml(p.label||'')}">
+        <input type="number" class="p-amount" placeholder="金额" value="${p.amount != null ? p.amount : ''}" inputmode="decimal">
+        <div class="rm-row">✕</div>
+      </div>
+    `).join('');
+  }
+  purchaseRowsEl.addEventListener('click', (e) => {
+    const rm = e.target.closest('.rm-row');
+    if(rm){
+      const idx = Number(rm.closest('.purchase-row').dataset.idx);
+      draft.purchases.splice(idx, 1);
+      renderPurchaseRows();
+    }
+  });
+  purchaseRowsEl.addEventListener('input', (e) => {
+    const row = e.target.closest('.purchase-row');
+    if(!row) return;
+    const idx = Number(row.dataset.idx);
+    if(e.target.classList.contains('p-label')) draft.purchases[idx].label = e.target.value;
+    if(e.target.classList.contains('p-amount')) draft.purchases[idx].amount = e.target.value === '' ? 0 : parseFloat(e.target.value);
+  });
+  document.querySelectorAll('.add-purchase-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      draft.purchases.push({ label: btn.dataset.preset || '', amount: 0 });
+      renderPurchaseRows();
+      // 聚焦到新加的这一行的名目/金额输入框
+      const rows = purchaseRowsEl.querySelectorAll('.purchase-row');
+      const last = rows[rows.length-1];
+      if(last){
+        const target = btn.dataset.preset ? last.querySelector('.p-amount') : last.querySelector('.p-label');
+        if(target) target.focus();
+      }
+    });
+  });
+
+  // 保存 / 删除
+  saveBtn.addEventListener('click', () => {
+    // 保存前把输入框里还没确认的文字也一并加入
+    if(contentInput.value.trim()) addFromInput(contentInput, draft.contents);
+    if(workerInput.value.trim()) addFromInput(workerInput, draft.workers);
+    // 过滤掉金额为0且名目为空的花销行（用户加了又没填的占位行）
+    draft.purchases = draft.purchases.filter(p => p.label || p.amount);
+    Storage.set(editingDate, draft);
+    closeEditor();
+    render();
+  });
+  deleteBtn.addEventListener('click', () => {
+    if(confirm('确定删除这一天的记录吗？')){
+      Storage.remove(editingDate);
+      closeEditor();
+      render();
+    }
+  });
+
+  // ============================================================
+  // 初始化
+  // ============================================================
+  render();
+
+})();
+</script>
+</body>
+</html>
