@@ -76,12 +76,24 @@ function importPhotoRecords(){
   save(ENTRY_KEY,entries);save(META_KEY,meta);
 }
 importPhotoRecords();
+let baselineAdjusted=false;
+function applyTargetDayBaselines(){
+  const adjustmentId='baseline_2026-08-17_me6_changzheng5_v1';
+  meta.adjustments=Array.isArray(meta.adjustments)?meta.adjustments:[];
+  meta.dayBaselines={...(meta.dayBaselines||{}),'我':'2026-08-17','长征':'2026-08-17'};
+  if(!meta.adjustments.includes(adjustmentId)){
+    meta.adjustments.push(adjustmentId);
+    baselineAdjusted=true;
+  }
+  save(META_KEY,meta);
+}
+applyTargetDayBaselines();
 function persist(){let a=save(ENTRY_KEY,entries),b=save(META_KEY,meta);if(!a||!b){toast('保存失败：请检查浏览器存储权限或空间');return false}return true}
 function activeWorkers(){return meta.workers.filter(x=>x.active)}function activeTasks(){return meta.tasks.filter(x=>x.active)}
 function dayCount(e){if(!e||e.type==='rest')return 0;return (e.type==='full'?1:e.type==='half'?.5:0)+(e.overtime?.5:0)}
 function entryHas(e,name){return (e.workers||[]).includes(name)}
 function settledDates(name){return new Set(meta.settlements.filter(s=>s.workerName===name).flatMap(s=>s.entryDates||[]))}
-function workerStats(name){let settled=settledDates(name),rows=Object.entries(entries).filter(([d,e])=>entryHas(e,name)&&!settled.has(d)&&dayCount(e)>0).sort((a,b)=>b[0].localeCompare(a[0]));return{days:rows.reduce((t,[,e])=>t+dayCount(e),0),rows}}
+function workerStats(name){let settled=settledDates(name),cutoff=meta.dayBaselines?.[name]||'',rows=Object.entries(entries).filter(([d,e])=>(!cutoff||d>=cutoff)&&entryHas(e,name)&&!settled.has(d)&&dayCount(e)>0).sort((a,b)=>b[0].localeCompare(a[0]));return{days:rows.reduce((t,[,e])=>t+dayCount(e),0),rows}}
 function allPeople(){let names=uniq([...activeWorkers().map(x=>x.name),...Object.values(entries).flatMap(e=>e.workers||[]),...meta.settlements.map(s=>s.workerName)]);return names.map(name=>({name,active:!!activeWorkers().find(x=>x.name===name),...workerStats(name)})).sort((a,b)=>(b.active-a.active)||b.days-a.days||a.name.localeCompare(b.name,'zh'))}
 function toast(msg){let el=$('#toast');el.textContent=msg;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),2200)}
 let currentWeek=weekStart(new Date()),selectedPerson=null,draft=null,originalDate=null,settlingPerson=null;
@@ -113,6 +125,7 @@ $$('[data-add]').forEach(b=>b.onclick=()=>addLibrary(b.dataset.add));$('#workerI
 $('#manage').onclick=e=>{let b=e.target.closest('[data-delete]');if(!b)return;let type=b.dataset.delete,name=b.dataset.name,label=type==='worker'?'工作人员':'工作内容';if(confirm(`确认删除${label}“${name}”？历史工作记录和结算记录会继续保留。`)){let item=(type==='worker'?meta.workers:meta.tasks).find(x=>x.name===name);if(item)item.active=false;persist();renderManage();renderPeople();toast('已从'+label+'库删除')}};
 renderLogs();renderPeople();renderManage();
 if(storageError)toast('浏览器存储不可用，请勿录入并检查手机浏览器设置');
+else if(baselineAdjusted)toast('天数已校正：我 6 天，长征 5 天');
 else if(photoImported||photoSkipped)toast(`照片记录已同步：新增 ${photoImported} 天${photoSkipped?'，保留已有 '+photoSkipped+' 天':''}`);
 })();
 </script></body></html>
