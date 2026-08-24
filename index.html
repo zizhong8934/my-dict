@@ -1,1357 +1,171 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>英语单词小词典</title>
-<style>
-  :root{
-    --bg:#0c0c0e;
-    --card-bg:#1a1a1d;
-    --card-bg-hover:#1e1e22;
-    --text:#f2f2f4;
-    --text-secondary:#98989d;
-    --label:#7d7d84;
-    --accent:#409cff;
-    --accent-hover:#5babff;
-    --stress:#ffcf5c;
-    --stress-bg:rgba(255,207,92,0.14);
-    --warn:#ffb340;
-    --warn-bg:rgba(255,179,64,0.1);
-    --warn-border:rgba(255,179,64,0.32);
-    --success:#32d74b;
-    --border:rgba(255,255,255,0.08);
-    --radius:16px;
-    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    font-family:var(--font);
-    background:var(--bg);
-    color:var(--text);
-    min-height:100vh;
-    -webkit-font-smoothing:antialiased;
-  }
-  .app{
-    max-width:760px;
-    margin:0 auto;
-    padding:40px 20px 90px;
-  }
-  header.top{
-    text-align:center;
-    margin-bottom:32px;
-  }
-  header.top h1{
-    font-size:24px;
-    font-weight:650;
-    letter-spacing:-0.01em;
-    margin:0 0 6px;
-    color:var(--text);
-  }
-  header.top p{
-    font-size:13px;
-    color:var(--text-secondary);
-    margin:0;
-  }
-  .panel{
-    background:var(--card-bg);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    padding:20px;
-    margin-bottom:20px;
-  }
-  textarea{
-    width:100%;
-    min-height:150px;
-    resize:vertical;
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:12px 14px;
-    font-size:14px;
-    font-family:var(--font);
-    line-height:1.6;
-    color:var(--text);
-    background:#111113;
-    outline:none;
-    transition:border-color .15s ease;
-  }
-  textarea::placeholder{color:#5c5c62;}
-  textarea:focus{border-color:var(--accent);}
-  .panel-footer{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    margin-top:12px;
-    gap:12px;
-    flex-wrap:wrap;
-  }
-  .hint{
-    font-size:12px;
-    color:var(--text-secondary);
-  }
-  button.primary{
-    background:var(--accent);
-    color:#08131f;
-    border:none;
-    border-radius:10px;
-    padding:10px 20px;
-    font-size:14px;
-    font-weight:600;
-    cursor:pointer;
-    transition:background .15s ease, transform .05s ease;
-    white-space:nowrap;
-  }
-  button.primary:hover{background:var(--accent-hover);}
-  button.primary:active{transform:scale(0.97);}
-  button.primary:disabled{background:#3a3a3d;color:#7a7a7e;cursor:not-allowed;}
-  .notice{
-    font-size:13px;
-    color:var(--warn);
-    background:var(--warn-bg);
-    border:1px solid var(--warn-border);
-    border-radius:10px;
-    padding:10px 14px;
-    margin-bottom:16px;
-    display:none;
-  }
-  .notice.show{display:block;}
-  .history-bar{
-    display:flex;
-    gap:8px;
-    overflow-x:auto;
-    padding-bottom:6px;
-    margin-bottom:14px;
-    scrollbar-width:thin;
-  }
-  .history-bar::-webkit-scrollbar{height:4px;}
-  .history-bar::-webkit-scrollbar-thumb{background:#333336;border-radius:4px;}
-  .day-chip{
-    flex-shrink:0;
-    border:1px solid var(--border);
-    background:transparent;
-    color:var(--text-secondary);
-    font-size:13px;
-    padding:6px 14px;
-    border-radius:999px;
-    cursor:pointer;
-    white-space:nowrap;
-    transition:background .15s ease, color .15s ease;
-  }
-  .day-chip:hover{background:var(--card-bg-hover);}
-  .day-chip.active{
-    background:var(--accent);
-    color:#08131f;
-    border-color:var(--accent);
-    font-weight:600;
-  }
-  .search-bar{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    background:var(--card-bg);
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:9px 14px;
-    margin-bottom:18px;
-  }
-  .search-bar input{
-    flex:1;
-    border:none;
-    outline:none;
-    font-size:14px;
-    font-family:var(--font);
-    color:var(--text);
-    background:transparent;
-  }
-  .search-bar input::placeholder{color:#5c5c62;}
-  .search-bar .icon{font-size:14px;color:var(--text-secondary);}
-  .stats-bar{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:14px;
-    font-size:12px;
-    color:var(--text-secondary);
-  }
-  .cards{
-    display:flex;
-    flex-direction:column;
-    gap:14px;
-  }
-  .card{
-    background:var(--card-bg);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    padding:22px 24px;
-    transition:opacity .2s ease;
-  }
-  .card.hidden{display:none;}
-  .card-row{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:10px;
-  }
-  .card-english{
-    font-size:22px;
-    font-weight:650;
-    color:var(--text);
-    word-break:break-word;
-    letter-spacing:-0.01em;
-  }
-  .speak-btn{
-    flex-shrink:0;
-    border:none;
-    background:rgba(64,156,255,0.12);
-    color:var(--accent);
-    width:34px;
-    height:34px;
-    border-radius:50%;
-    font-size:15px;
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    transition:background .15s ease;
-  }
-  .speak-btn:hover{background:rgba(64,156,255,0.22);}
-  .speak-btn:active{transform:scale(0.92);}
-  .field{
-    margin-top:14px;
-  }
-  .field-label{
-    font-size:12px;
-    font-weight:600;
-    color:var(--label);
-    letter-spacing:0.02em;
-    margin-bottom:4px;
-  }
-  .field-value{
-    font-size:15px;
-    color:var(--text);
-    line-height:1.6;
-  }
-  .field-value.mono{
-    font-family:"SF Mono", Menlo, Consolas, monospace;
-    font-size:14px;
-  }
-  .syllable-list{
-    list-style:none;
-    margin:2px 0 0;
-    padding:0;
-  }
-  .syllable-list li{
-    font-size:15px;
-    color:var(--text);
-    padding:3px 0 3px 16px;
-    position:relative;
-  }
-  .syllable-list li::before{
-    content:"•";
-    position:absolute;
-    left:0;
-    color:var(--text-secondary);
-  }
-  .syllable-list .stress{
-    color:var(--stress);
-    background:var(--stress-bg);
-    padding:1px 4px;
-    border-radius:4px;
-    font-weight:700;
-  }
-  .example-block{
-    margin-top:2px;
-  }
-  .example-en{
-    font-size:15px;
-    font-weight:600;
-    color:var(--text);
-    line-height:1.6;
-  }
-  .example-zh{
-    font-size:14px;
-    color:var(--text-secondary);
-    margin-top:2px;
-    line-height:1.6;
-  }
-  .spelling-warn{
-    margin-top:16px;
-    background:var(--warn-bg);
-    border:1px solid var(--warn-border);
-    border-radius:10px;
-    padding:10px 14px;
-    font-size:13px;
-    color:var(--warn);
-  }
-  .spelling-warn .actions{
-    margin-top:8px;
-    display:flex;
-    gap:8px;
-  }
-  .spelling-warn button{
-    font-size:12px;
-    padding:5px 10px;
-    border-radius:6px;
-    border:1px solid var(--warn-border);
-    background:transparent;
-    color:var(--warn);
-    cursor:pointer;
-  }
-  .spelling-warn button.accept{
-    background:var(--warn);
-    color:#221a05;
-    border-color:var(--warn);
-  }
-  .spelling-unknown{
-    margin-top:14px;
-    font-size:12px;
-    color:var(--text-secondary);
-  }
-  .dict-notfound{
-    margin-top:14px;
-    font-size:12px;
-    color:var(--text-secondary);
-  }
-  .network-warn{
-    margin-top:14px;
-    font-size:12px;
-    color:var(--text-secondary);
-    background:rgba(255,255,255,0.04);
-    border-radius:8px;
-    padding:8px 12px;
-  }
-  .retry-btn{
-    margin-top:8px;
-    font-size:12px;
-    padding:5px 12px;
-    border-radius:6px;
-    border:1px solid var(--border);
-    background:transparent;
-    color:var(--accent);
-    cursor:pointer;
-  }
-  .retry-btn:hover{background:rgba(64,156,255,0.1);}
-  .empty-state{
-    text-align:center;
-    padding:60px 20px;
-    color:var(--text-secondary);
-    font-size:14px;
-  }
-  @media (max-width:600px){
-    .app{padding:24px 14px 70px;}
-    .card{padding:18px 18px;}
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#090a0d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>英语单词小词典</title>
+  <link rel="stylesheet" href="./styles.css?v=20260823-practice-v2">
 </head>
 <body>
-<div class="app">
-  <header class="top">
-    <h1>英语单词小词典</h1>
-    <p>粘贴单词或短语，自动拆分、校对拼写并补充词典信息</p>
-  </header>
+  <main class="app-shell">
+    <header class="topbar">
+      <div><p class="eyebrow">CLASSROOM MODE</p><h1>英语单词小词典</h1></div>
+      <button class="icon-button" id="settingsButton" aria-label="设置">⚙</button>
+    </header>
 
-  <section class="panel">
-    <textarea id="inputArea" placeholder="例如：
-unfortunately —— 不幸地；遗憾的是
-flight attendant —— 空乘人员；空姐；空少
-pilot"></textarea>
-    <div class="panel-footer">
-      <span class="hint" id="lineHint">支持中英混合或纯英文输入，每行一条，最多 50 条</span>
-      <button class="primary" id="processBtn">开始整理</button>
-    </div>
-  </section>
+    <section class="view active" id="classroomView" data-view="classroom">
+      <div class="hero-card">
+        <div class="hero-copy"><span class="status-dot"></span><span>本地词典已就绪 · 拍完自动出卡片</span></div>
+        <h2>上课只做两件事</h2>
+        <p>拍下课本，或把老师讲的词直接贴进来。</p>
+        <div class="action-grid">
+          <button class="action primary" id="cameraButton"><span class="action-icon">▣</span><strong>拍照识别</strong><small>自动提取标记词</small></button>
+          <button class="action" id="quickButton"><span class="action-icon">＋</span><strong>快速输入</strong><small>英文可带中文意思</small></button>
+        </div>
+        <input id="cameraInput" type="file" accept="image/*,.heic,.heif" capture="environment" hidden>
+        <input id="galleryInput" type="file" accept="image/*,.heic,.heif" multiple hidden>
+        <button class="text-button" id="galleryButton">从相册选择照片</button>
+      </div>
 
-  <div class="notice" id="limitNotice">本次最多处理50条，超过的内容暂未导入。</div>
+      <section class="scan-panel hidden" id="scanPanel" aria-live="polite">
+        <div class="scan-head"><div><p class="section-kicker">PHOTO SCAN</p><h2 id="scanTitle">正在准备照片</h2></div><span class="progress-number" id="progressNumber">0%</span></div>
+        <div class="progress-track"><div id="progressBar"></div></div>
+        <p id="scanMessage">照片会留在这台设备上处理。</p>
+        <div class="scan-preview-wrap"><img id="scanPreview" alt="待识别照片预览"><canvas id="scanOverlay"></canvas></div>
+        <button class="secondary-button hidden" id="cancelScanButton">停止识别</button>
+      </section>
 
-  <div class="history-bar" id="historyBar"></div>
+      <section class="result-section" id="latestSection">
+        <div class="section-title-row"><div><p class="section-kicker">LATEST</p><h2>刚刚生成</h2></div><button class="text-button compact" id="clearLatestButton">清空本次</button></div>
+        <div id="latestEmpty" class="empty-state"><span>01</span><p>拍照后，识别到的标记词会按阅读顺序直接出现在这里。</p></div>
+        <div class="card-list" id="latestCards"></div>
+      </section>
+    </section>
 
-  <div class="search-bar">
-    <span class="icon">🔎</span>
-    <input type="text" id="filterInput" placeholder="搜索单词或中文意思">
+    <section class="view" id="todayView" data-view="today">
+      <div class="page-heading"><p class="section-kicker">TODAY</p><h2>今日单词</h2><p id="todaySummary">今天还没有保存单词。</p></div>
+      <div class="card-list" id="todayCards"></div>
+      <section class="practice-entry" id="practiceEntry">
+        <div class="practice-entry-copy">
+          <p class="section-kicker">QUICK PRACTICE</p>
+          <h2>今天的词，马上练一遍</h2>
+          <p id="practiceSummary">录入单词后即可开始，错词会自动再出现。</p>
+        </div>
+        <div class="practice-actions">
+          <button class="practice-mode typing" id="startTypingGame">
+            <span class="practice-icon">⌨</span>
+            <strong>海怪速击</strong>
+            <small>看提示拼写，打字击退</small>
+          </button>
+          <button class="practice-mode sentence" id="startSentenceGame">
+            <span class="practice-icon">▤</span>
+            <strong>句子拼读</strong>
+            <small>把今日生词填回句子</small>
+          </button>
+        </div>
+      </section>
+    </section>
+
+    <section class="view" id="libraryView" data-view="library">
+      <div class="page-heading"><p class="section-kicker">LIBRARY</p><h2>我的词库</h2></div>
+      <label class="search-box"><span>⌕</span><input id="librarySearch" placeholder="搜索英文或中文" autocomplete="off"></label>
+      <p class="library-summary" id="librarySummary"></p><div class="card-list" id="libraryCards"></div>
+    </section>
+
+    <section class="view" id="settingsView" data-view="settings">
+      <div class="page-heading"><p class="section-kicker">SETTINGS</p><h2>设置</h2><p>所有学习记录默认只保存在你当前使用的浏览器里。</p></div>
+      <div class="settings-card"><div><strong>拍照自动生成卡片</strong><small>不需要逐个点击读取</small></div><span class="toggle on">开启</span></div>
+      <div class="settings-card"><div><strong>保留重复词</strong><small>同一张照片重复出现也按原顺序保留</small></div><span class="toggle on">开启</span></div>
+      <div class="settings-card"><div><strong>排序方式</strong><small>先从左到右，再从上到下</small></div><span class="value">阅读顺序</span></div>
+      <button class="danger-button" id="eraseButton">删除本机全部学习记录</button>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="主导航">
+    <button class="nav-item active" data-target="classroom"><span>◉</span><small>课堂</small></button>
+    <button class="nav-item" data-target="today"><span>▤</span><small>今日</small></button>
+    <button class="nav-item" data-target="library"><span>▥</span><small>词库</small></button>
+    <button class="nav-item" data-target="settings"><span>⚙</span><small>设置</small></button>
+  </nav>
+
+  <div class="modal-backdrop hidden" id="quickModal">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
+      <div class="modal-head"><div><p class="section-kicker">QUICK ADD</p><h2 id="quickTitle">快速输入</h2></div><button class="icon-button" id="closeQuickButton">×</button></div>
+      <p class="modal-help">一行一个。可以只写英文，也可以直接带中文意思。</p>
+      <textarea id="quickInput" placeholder="environment 环境&#10;look forward to 期待&#10;responsibility 责任"></textarea>
+      <p class="input-status" id="quickStatus">中文意思会优先使用；没有中文时自动查本地词典。</p>
+      <button class="action primary full" id="generateButton"><strong>直接生成单词卡片</strong></button>
+    </section>
   </div>
 
-  <div class="stats-bar">
-    <span id="statsText">今日单词：0 条</span>
-    <span id="processingText"></span>
-  </div>
+  <div class="practice-backdrop hidden" id="practiceModal">
+    <section class="practice-shell" role="dialog" aria-modal="true" aria-labelledby="practiceTitle">
+      <header class="practice-head">
+        <div><p class="section-kicker" id="practiceKicker">QUICK PRACTICE</p><h2 id="practiceTitle">今日速练</h2></div>
+        <button class="icon-button" id="closePracticeButton" aria-label="退出练习">×</button>
+      </header>
 
-  <div class="cards" id="cardsContainer"></div>
-  <div class="empty-state" id="emptyState">今天还没有单词，先在上方输入一些试试吧。</div>
-</div>
+      <div class="practice-menu" id="practiceMenu">
+        <p>只使用今天录入的单词。重复词保留，答错的词会在本轮末尾再次出现。</p>
+        <div class="practice-menu-grid">
+          <button class="practice-menu-card typing" id="menuTypingGame"><span>⌨</span><strong>海怪速击</strong><small>根据中文和音节拼出英文，输入完成即可击退。</small></button>
+          <button class="practice-menu-card sentence" id="menuSentenceGame"><span>▤</span><strong>句子拼读</strong><small>今天的生词会进入短句，拼写正确后自动读出整句。</small></button>
+        </div>
+        <p class="practice-menu-note" id="practiceMenuNote"></p>
+      </div>
 
-<script>
-(function(){
-  'use strict';
+      <div class="practice-play hidden" id="practicePlay">
+        <div class="practice-progress-row"><span id="practiceProgressText">1 / 1</span><span id="practiceScoreText">正确 0</span></div>
+        <div class="practice-progress"><i id="practiceProgressBar"></i></div>
 
-  // ============================================================
-  // Config
-  // ============================================================
-  const CONFIG = {
-    MAX_RECORDS: 50,
-    MAX_MEANINGS: 5,
-    CONCURRENCY: 4,
-    HISTORY_DAYS: 20,        // 历史记录最长保留天数，超过自动清理
-    RETRY_COUNT: 2,          // 网络请求失败时的重试次数（不含首次）
-    RETRY_DELAY: 600,        // 重试前的等待毫秒数
-    STORAGE_KEY: 'ewd_cards_v1',
-    CACHE_KEY: 'ewd_lookup_cache_v1',
-    DICT_API: 'https://api.dictionaryapi.dev/api/v2/entries/en/',
-    WIKTIONARY_API: 'https://en.wiktionary.org/api/rest_v1/page/definition/',
-    DATAMUSE_API: 'https://api.datamuse.com/words?max=1&sp=',
-    TRANSLATE_API: 'https://api.mymemory.translated.net/get?langpair=en|zh-CN&q='
-  };
+        <div class="monster-stage" id="monsterStage" aria-hidden="true">
+          <div class="mini-monster" id="miniMonster"><i></i><i></i><i></i><b>••</b></div>
+          <div class="defense-line"></div>
+        </div>
 
-  // ============================================================
-  // Utils
-  // ============================================================
-  const Utils = {
-    isChineseChar(ch){ return /[\u4e00-\u9fa5]/.test(ch); },
-    firstChineseIndex(str){
-      for(let i=0;i<str.length;i++){ if(Utils.isChineseChar(str[i])) return i; }
-      return -1;
-    },
-    todayStr(){
-      const d = new Date();
-      return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    },
-    normalizeKey(word){ return word.trim().toLowerCase().replace(/\s+/g,' '); },
-    escapeHtml(str){
-      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-    },
-    isAlpha(word){ return /^[a-zA-Z]+$/.test(word); },
-    // simple Levenshtein distance for sanity-checking suggestions
-    editDistance(a,b){
-      a=a.toLowerCase(); b=b.toLowerCase();
-      const dp = Array.from({length:a.length+1},()=>new Array(b.length+1).fill(0));
-      for(let i=0;i<=a.length;i++) dp[i][0]=i;
-      for(let j=0;j<=b.length;j++) dp[0][j]=j;
-      for(let i=1;i<=a.length;i++){
-        for(let j=1;j<=b.length;j++){
-          dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j-1],dp[i-1][j],dp[i][j-1]);
-        }
-      }
-      return dp[a.length][b.length];
-    },
-    sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); },
-    // day difference between two 'YYYY-MM-DD' strings (a - b), in whole days
-    dateDiffDays(dateStrA, dateStrB){
-      const a = new Date(dateStrA + 'T00:00:00');
-      const b = new Date(dateStrB + 'T00:00:00');
-      return Math.round((a - b) / 86400000);
-    },
-    formatDateLabel(dateStr){
-      const today = Utils.todayStr();
-      if(dateStr === today) return '今天';
-      const yest = new Date(); yest.setDate(yest.getDate()-1);
-      const yestStr = yest.getFullYear()+'-'+String(yest.getMonth()+1).padStart(2,'0')+'-'+String(yest.getDate()).padStart(2,'0');
-      if(dateStr === yestStr) return '昨天';
-      const parts = dateStr.split('-');
-      return parts[1] + '-' + parts[2];
-    },
-    POS_ABBR: {
-      noun:'n.', verb:'v.', adjective:'adj.', adverb:'adv.', pronoun:'pron.',
-      preposition:'prep.', conjunction:'conj.', interjection:'interj.',
-      determiner:'det.', numeral:'num.', article:'art.'
-    },
-    abbreviatePOS(list){
-      return (list || []).map(p => Utils.POS_ABBR[p.toLowerCase()] || p).join('、');
-    },
-    // 本地估算音节数（元音组计数法），拼写检测拿不到权威数据时的兜底方案
-    estimateSyllableCount(word){
-      const w = word.toLowerCase();
-      if(!/^[a-z]+$/.test(w)) return 1;
-      let count = (w.match(/[aeiouy]+/g) || []).length;
-      if(w.endsWith('e') && !w.endsWith('le') && count > 1) count -= 1; // 常见不发音的结尾e
-      return Math.max(1, count);
-    },
-    // 近似音节切分（按元音组分块），并修正常见的结尾不发音 e（如 sites/like/hope 应算1个音节）
-    syllabifyWordChunks(word){
-      const w = word.toLowerCase();
-      if(!/^[a-z]+$/.test(w) || w.length <= 3) return null;
-      const chunks = w.match(/[^aeiouy]*[aeiouy]+/g);
-      if(!chunks || chunks.length <= 1) return null;
-      const consumed = chunks.join('');
-      const leftover = w.slice(consumed.length);
-      if(leftover) chunks[chunks.length-1] += leftover;
-
-      // 结尾不发音 e 的判断：必须是整个词本身以 e / es / ed 结尾（如 site、sites、hoped）
-      // 才可能是不发音e；像 weather、water 这种词尾是别的辅音，其中的e是正常发音的元音，不能合并
-      if(chunks.length > 1){
-        const wordEndsInSilentEPattern = /e([sd])?$/i.test(w);
-        const endsWithLe = /le([sd])?$/i.test(w); // "-le" 结尾时 e 自成音节（table、circle），要保留
-        const last = chunks[chunks.length-1];
-        const lastChunkIsPureE = /^[^aeiouy]*e[^aeiouy]{0,2}$/i.test(last);
-        if(wordEndsInSilentEPattern && !endsWithLe && lastChunkIsPureE){
-          chunks[chunks.length-2] += chunks.pop();
-        }
-      }
-      return chunks;
-    },
-    // 根据 IPA 音标中的主重音符号 ˈ，定位重音落在第几个音节（0-based）
-    // 只有当音节数量与我们切分出的块数吻合时才采用，否则返回 null（不做误导性标注）
-    findStressIndex(phonetic, expectedCount){
-      if(!phonetic) return null;
-      const idx = phonetic.indexOf('ˈ');
-      if(idx === -1) return null;
-      const before = phonetic.slice(0, idx);
-      const VOWEL_GROUP = /[iyɨʉɯuɪʏʊeøɘəɵɤoɛœɜɞʌɔæɐaɑɒ]+/gi;
-      const nuclei = before.match(VOWEL_GROUP) || [];
-      const stressIndex = nuclei.length;
-      if(stressIndex >= 0 && stressIndex < expectedCount) return stressIndex;
-      return null;
-    }
-  };
-
-  // ============================================================
-  // Parser Module — splits raw textarea input into records
-  // ============================================================
-  const Parser = {
-    // strip separator symbols/whitespace trailing the english part
-    SEP_TRAIL_RE: /[\s\-–—:：]+$/,
-    // strip common list-bullet prefixes at the start of a line, e.g. "* ", "- ", "• ", "1. ", "2) "
-    LEADING_BULLET_RE: /^(?:[*\-•·▪◦]+|\d+[.)、])\s*/,
-
-    parseLine(rawLine){
-      let line = rawLine.trim();
-      if(!line) return null;
-
-      line = line.replace(this.LEADING_BULLET_RE, '').trim();
-      if(!line) return null;
-
-      const ci = Utils.firstChineseIndex(line);
-      if(ci === -1){
-        // pure english line, no translation supplied
-        return { english: line, translation: null };
-      }
-
-      let englishPart = line.slice(0, ci);
-      englishPart = englishPart.replace(this.SEP_TRAIL_RE, '').trim();
-
-      let translationPart = line.slice(ci).trim();
-      // strip any leading separator punctuation left over (rare)
-      translationPart = translationPart.replace(/^[\s\-–—:：]+/, '').trim();
-
-      if(!englishPart) return null; // malformed line, nothing usable
-      return { english: englishPart, translation: translationPart || null };
-    },
-
-    parseInput(text){
-      const rawLines = text.split(/\r?\n/);
-      const parsed = [];
-      const seenKeys = new Set();
-      let validLineCount = 0;
-
-      for(const rawLine of rawLines){
-        if(!rawLine.trim()) continue; // ignore blank lines
-        const rec = this.parseLine(rawLine);
-        if(!rec) continue;
-        validLineCount++;
-
-        const key = Utils.normalizeKey(rec.english);
-        if(seenKeys.has(key)) continue; // remove exact duplicate words
-        seenKeys.add(key);
-        parsed.push(rec);
-      }
-
-      const truncated = parsed.length > CONFIG.MAX_RECORDS;
-      const records = parsed.slice(0, CONFIG.MAX_RECORDS);
-      return { records, truncated };
-    }
-  };
-
-  // ============================================================
-  // Local cache for network lookups (reduces repeat requests)
-  // ============================================================
-  const LookupCache = {
-    _data: null,
-    load(){
-      if(this._data) return this._data;
-      try{
-        this._data = JSON.parse(localStorage.getItem(CONFIG.CACHE_KEY) || '{}');
-      }catch(e){ this._data = {}; }
-      return this._data;
-    },
-    get(key){ return this.load()[key]; },
-    set(key, value){
-      const d = this.load();
-      d[key] = value;
-      try{ localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify(d)); }catch(e){ /* storage full, ignore */ }
-    }
-  };
-
-  // ============================================================
-  // SpellChecker Module (Datamuse fuzzy spelling match)
-  // ============================================================
-  const SpellChecker = {
-    async checkWord(word){
-      if(!Utils.isAlpha(word) || word.length < 3){
-        return { status:'unknown' }; // acronyms, names, too short to judge
-      }
-      // capitalized mid-sentence-style words are likely proper nouns
-      if(/^[A-Z]/.test(word) && word !== word.toUpperCase()){
-        return { status:'unknown' };
-      }
-      const cacheKey = 'spell:' + word.toLowerCase();
-      const cached = LookupCache.get(cacheKey);
-      if(cached) return cached;
-
-      try{
-        // md=s 附带请求权威音节数，和拼写检测共用一次请求，减少网络往返
-        const res = await fetch(CONFIG.DATAMUSE_API + encodeURIComponent(word) + '&md=s');
-        if(!res.ok) throw new Error('spell api failed');
-        const data = await res.json();
-        let result;
-        if(!data.length){
-          result = { status:'unknown', numSyllables: Utils.estimateSyllableCount(word) };
-        }else{
-          const top = data[0];
-          const numSyllables = typeof top.numSyllables === 'number' ? top.numSyllables : Utils.estimateSyllableCount(word);
-          if(top.word.toLowerCase() === word.toLowerCase()){
-            result = { status:'correct', numSyllables };
-          }else{
-            const dist = Utils.editDistance(word, top.word);
-            if(dist <= 2){
-              result = { status:'suspect', suggestion: top.word, numSyllables };
-            }else{
-              result = { status:'unknown', numSyllables };
-            }
-          }
-        }
-        LookupCache.set(cacheKey, result);
-        return result;
-      }catch(e){
-        return { status:'unknown', numSyllables: Utils.estimateSyllableCount(word), networkFailed:true };
-      }
-    },
-
-    // checks each significant word in a phrase; returns first suspect found + total syllable count
-    async checkPhrase(english){
-      const allWords = english.split(/\s+/).filter(Utils.isAlpha);
-      const checkable = allWords.filter(w => w.length>2);
-      let totalSyllables = 0;
-      let suspectResult = null;
-
-      for(const w of allWords){
-        if(w.length<=2){ totalSyllables += 1; continue; } // 短功能词直接按1个音节估算
-        const r = await this.checkWord(w);
-        totalSyllables += r.numSyllables || 1;
-        if(!suspectResult && r.status === 'suspect'){
-          const suggestedPhrase = english.replace(new RegExp('\\b'+w+'\\b','i'), r.suggestion);
-          suspectResult = { status:'suspect', original: english, suggestion: suggestedPhrase };
-        }
-      }
-      if(suspectResult){ suspectResult.numSyllables = totalSyllables; return suspectResult; }
-      return { status:'correct', numSyllables: totalSyllables };
-    }
-  };
-
-  // ============================================================
-  // DictionaryService Module (dictionaryapi.dev)
-  // ============================================================
-  const DictionaryService = {
-    // one attempt: throws on transient/network error, resolves { notFound:true } on 404
-    async _attempt(english){
-      const res = await fetch(CONFIG.DICT_API + encodeURIComponent(english.toLowerCase()));
-      if(res.status === 404) return { notFound: true };
-      if(!res.ok) throw new Error('dict api http ' + res.status);
-      const data = await res.json();
-      const entry = data[0];
-      const partsOfSpeech = [];
-      let example = null;
-      let phonetic = entry.phonetic || (entry.phonetics && entry.phonetics.find(p=>p.text)?.text) || null;
-
-      (entry.meanings || []).forEach(m=>{
-        if(m.partOfSpeech && !partsOfSpeech.includes(m.partOfSpeech)){
-          partsOfSpeech.push(m.partOfSpeech);
-        }
-        if(!example){
-          const withExample = (m.definitions || []).find(d => d.example);
-          if(withExample) example = withExample.example;
-        }
-      });
-
-      return { ok:true, phonetic, partsOfSpeech: partsOfSpeech.slice(0,2), example };
-    },
-
-    // 词典未收录该词（404）与真正的网络/接口故障要分开处理：
-    // 404 不重试（重试也没用），网络故障重试 CONFIG.RETRY_COUNT 次后才判定为失败
-    async lookup(english){
-      const cacheKey = 'dict:' + english.toLowerCase();
-      const cached = LookupCache.get(cacheKey);
-      if(cached) return cached;
-
-      let lastError = null;
-      for(let attempt = 0; attempt <= CONFIG.RETRY_COUNT; attempt++){
-        try{
-          const result = await this._attempt(english);
-          if(result.notFound){
-            const notFoundResult = { ok:false, notFound:true };
-            LookupCache.set(cacheKey, notFoundResult);
-            return notFoundResult;
-          }
-          LookupCache.set(cacheKey, result);
-          return result;
-        }catch(e){
-          lastError = e;
-          if(attempt < CONFIG.RETRY_COUNT) await Utils.sleep(CONFIG.RETRY_DELAY);
-        }
-      }
-      console.warn('[英语单词小词典] 词典接口连接失败：', lastError);
-      return { ok:false, notFound:false }; // genuine connection failure, don't cache
-    }
-  };
-
-  // ============================================================
-  // WiktionaryService — 备用词源。dictionaryapi.dev 收录的词条有限，
-  // 查不到时用维基词典的公开接口再试一次，覆盖面更广（含不少短语/习语条目）。
-  // 局限：这个接口不提供 IPA 音标，只补充词性和释义/例句。
-  // ============================================================
-  const WiktionaryService = {
-    stripHtml(html){
-      return String(html || '').replace(/<[^>]+>/g, '').replace(/\s+/g,' ').trim();
-    },
-    async _attempt(term){
-      const res = await fetch(CONFIG.WIKTIONARY_API + encodeURIComponent(term.toLowerCase()));
-      if(res.status === 404) return { notFound: true };
-      if(!res.ok) throw new Error('wiktionary api http ' + res.status);
-      const data = await res.json();
-      const enEntries = data.en || [];
-      if(!enEntries.length) return { notFound: true };
-
-      const partsOfSpeech = [];
-      let example = null;
-      enEntries.forEach(entry => {
-        if(entry.partOfSpeech && !partsOfSpeech.includes(entry.partOfSpeech.toLowerCase())){
-          partsOfSpeech.push(entry.partOfSpeech.toLowerCase());
-        }
-        if(!example){
-          const withExample = (entry.definitions || []).find(d => d.parsedExamples && d.parsedExamples.length);
-          if(withExample) example = this.stripHtml(withExample.parsedExamples[0].example);
-        }
-      });
-
-      return { ok:true, partsOfSpeech: partsOfSpeech.slice(0,2), example };
-    },
-    async lookup(term){
-      const cacheKey = 'wikt:' + term.toLowerCase();
-      const cached = LookupCache.get(cacheKey);
-      if(cached) return cached;
-
-      let lastError = null;
-      for(let attempt = 0; attempt <= CONFIG.RETRY_COUNT; attempt++){
-        try{
-          const result = await this._attempt(term);
-          if(result.notFound){
-            const nf = { ok:false, notFound:true };
-            LookupCache.set(cacheKey, nf);
-            return nf;
-          }
-          LookupCache.set(cacheKey, result);
-          return result;
-        }catch(e){
-          lastError = e;
-          if(attempt < CONFIG.RETRY_COUNT) await Utils.sleep(CONFIG.RETRY_DELAY);
-        }
-      }
-      console.warn('[英语单词小词典] 维基词典接口连接失败：', lastError);
-      return { ok:false, notFound:false };
-    }
-  };
-
-  // ============================================================
-  // WordLookupService — 单个词的统一解析入口：先查主词典，查不到再查维基词典兜底
-  // ============================================================
-  const WordLookupService = {
-    async resolve(word){
-      const primary = await DictionaryService.lookup(word);
-      if(primary.ok){
-        // 主词典有词条，但没带例句——顺手问一次维基词典，尽量把例句补全
-        if(!primary.example){
-          const wikt = await WiktionaryService.lookup(word);
-          if(wikt.ok && wikt.example) return { ...primary, example: wikt.example };
-        }
-        return primary;
-      }
-      if(primary.notFound){
-        const fallback = await WiktionaryService.lookup(word);
-        if(fallback.ok) return { ok:true, phonetic:null, partsOfSpeech: fallback.partsOfSpeech, example: fallback.example };
-        if(fallback.notFound) return { ok:false, notFound:true };
-        return { ok:false, notFound:false }; // 维基词典连接失败，视为网络问题
-      }
-      return primary; // 主词典本身网络连接失败
-    }
-  };
-
-  // ============================================================
-  // PhraseLookupService — 短语的统一解析：
-  // 1) 先把整个短语当成一个词条去查（有的固定搭配本身就有词条，例如 "flight attendant"）
-  // 2) 查不到的话，拆成单个词分别查，再拼在一起，保证短语和单词体验一致
-  // ============================================================
-  const PhraseLookupService = {
-    async resolve(text){
-      const isPhrase = /\s/.test(text.trim());
-      if(!isPhrase){
-        const r = await WordLookupService.resolve(text);
-        return { ...r, perWord: null };
-      }
-
-      // 先整体尝试
-      const whole = await WordLookupService.resolve(text);
-      if(whole.ok) return { ...whole, perWord: null };
-      if(!whole.notFound) return { ok:false, notFound:false, perWord: null }; // 网络故障，直接报告
-
-      // 整体查不到，拆词分别查
-      const words = text.trim().split(/\s+/);
-      const results = await Promise.all(words.map(w => WordLookupService.resolve(w)));
-
-      const anyNetworkFailure = results.some(r => !r.ok && !r.notFound);
-      const foundAny = results.some(r => r.ok);
-
-      if(!foundAny){
-        return anyNetworkFailure ? { ok:false, notFound:false, perWord: null } : { ok:false, notFound:true, perWord: null };
-      }
-
-      const phoneticParts = results.map(r => r.ok && r.phonetic ? r.phonetic.replace(/^\/|\/$/g,'') : null);
-      const phonetic = phoneticParts.every(p => !p) ? null : '/' + phoneticParts.map(p => p || '…').join(' ') + '/';
-      const partsOfSpeech = [];
-      results.forEach(r => { if(r.ok) r.partsOfSpeech.forEach(p => { if(!partsOfSpeech.includes(p)) partsOfSpeech.push(p); }); });
-      const example = (results.find(r => r.ok && r.example) || {}).example || null;
-
-      return {
-        ok:true,
-        phonetic,
-        partsOfSpeech: partsOfSpeech.slice(0,3),
-        example,
-        perWord: words.map((w,i) => ({ word:w, ok: results[i].ok }))
-      };
-    }
-  };
-
-  // ============================================================
-  // TranslateService Module (MyMemory) — supplements Chinese meaning
-  // ============================================================
-  const TranslateService = {
-    async translate(english){
-      const cacheKey = 'tr:' + english.toLowerCase();
-      const cached = LookupCache.get(cacheKey);
-      if(cached) return cached;
-
-      let lastError = null;
-      for(let attempt = 0; attempt <= CONFIG.RETRY_COUNT; attempt++){
-        try{
-          const res = await fetch(CONFIG.TRANSLATE_API + encodeURIComponent(english));
-          if(!res.ok) throw new Error('translate api http ' + res.status);
-          const data = await res.json();
-          const text = data?.responseData?.translatedText;
-          if(text && !/MYMEMORY WARNING/i.test(text)){
-            const result = { ok:true, text: text.trim() };
-            LookupCache.set(cacheKey, result);
-            return result;
-          }
-          // valid response but no usable translation — not a network problem, don't retry
-          const emptyResult = { ok:false, notFound:true };
-          LookupCache.set(cacheKey, emptyResult);
-          return emptyResult;
-        }catch(e){
-          lastError = e;
-          if(attempt < CONFIG.RETRY_COUNT) await Utils.sleep(CONFIG.RETRY_DELAY);
-        }
-      }
-      console.warn('[英语单词小词典] 翻译接口连接失败：', lastError);
-      return { ok:false, notFound:false };
-    }
-  };
-
-  // ============================================================
-  // Meaning merge helper
-  // ============================================================
-  function mergeMeanings(userTranslation, webText){
-    const userMeanings = userTranslation
-      ? userTranslation.split(/[；;，,、]/).map(s=>s.trim()).filter(Boolean)
-      : [];
-    const merged = [...userMeanings];
-    if(webText){
-      const webParts = webText.split(/[；;，,、]/).map(s=>s.trim()).filter(Boolean);
-      for(const wp of webParts){
-        const exists = merged.some(m => m === wp || m.includes(wp) || wp.includes(m));
-        if(!exists) merged.push(wp);
-        if(merged.length >= CONFIG.MAX_MEANINGS) break;
-      }
-    }
-    return merged.slice(0, CONFIG.MAX_MEANINGS);
-  }
-
-  // ============================================================
-  // Concurrency pool helper
-  // ============================================================
-  async function runPool(items, worker, concurrency){
-    const results = new Array(items.length);
-    let index = 0;
-    async function next(){
-      while(index < items.length){
-        const cur = index++;
-        results[cur] = await worker(items[cur], cur);
-      }
-    }
-    const runners = Array.from({length: Math.min(concurrency, items.length)}, next);
-    await Promise.all(runners);
-    return results;
-  }
-
-  // ============================================================
-  // Card building pipeline
-  // ============================================================
-  async function buildCard(rec, dateAdded, batchTime){
-    const day = dateAdded || Utils.todayStr();
-    const card = {
-      id: Utils.normalizeKey(rec.english) + '::' + day,
-      english: rec.english,
-      userTranslation: rec.translation,
-      meanings: rec.translation ? rec.translation.split(/[；;，,、]/).map(s=>s.trim()).filter(Boolean) : [],
-      partsOfSpeech: [],
-      phonetic: null,
-      syllableWords: null,    // [{word, chunks, stressIndex}]，短语和单词统一用这个结构
-      example: null,
-      exampleZh: null,
-      spellingStatus: 'unknown',
-      spellingSuggestion: null,
-      networkFailed: false,   // 真正的连接失败（可重试）
-      dictNotFound: false,    // 词典 / 翻译库确实没收录这个词（重试无意义）
-      dateAdded: day,
-      batchTime: batchTime || Date.now()  // 同一批次整理的单词共用一个时间戳，用来让新批次排在前面
-    };
-
-    // spelling check (multi-word aware)
-    try{
-      const spellResult = await SpellChecker.checkPhrase(rec.english);
-      card.spellingStatus = spellResult.status;
-      if(spellResult.status === 'suspect'){
-        card.spellingSuggestion = spellResult.suggestion;
-      }
-    }catch(e){
-      card.spellingStatus = 'unknown';
-    }
-
-    // dictionary + translation lookups run in parallel
-    // 词典解析：短语和单词走同一条统一逻辑（PhraseLookupService），保证体验一致——
-    // 短语先整体查，查不到就拆词分别查主词典+维基词典兜底再拼起来
-    const [dictResult, trResult] = await Promise.all([
-      PhraseLookupService.resolve(rec.english),
-      TranslateService.translate(rec.english)
-    ]);
-
-    if(dictResult.ok){
-      card.phonetic = dictResult.phonetic;
-      card.partsOfSpeech = dictResult.partsOfSpeech;
-      card.example = dictResult.example || null;
-    }else if(dictResult.notFound){
-      card.dictNotFound = true;
-    }else{
-      card.networkFailed = true;
-    }
-
-    // 音节拆分：不管是单词还是短语，逐个词计算，保持体验一致
-    // 短语场景下，每个词的重音要用它自己单独查到的音标来定位（而不是拼接后的整体音标）
-    {
-      const words = rec.english.trim().split(/\s+/);
-      const perWordPhonetics = {};
-      if(dictResult.perWord){
-        // 拆词模式：需要各自的音标才能判断重音，重新用缓存查一次（几乎不产生新请求，命中缓存）
-        await Promise.all(words.map(async w => {
-          const r = await DictionaryService.lookup(w);
-          if(r.ok) perWordPhonetics[w.toLowerCase()] = r.phonetic;
-        }));
-      }else if(words.length === 1){
-        perWordPhonetics[words[0].toLowerCase()] = card.phonetic;
-      }
-
-      const syllableWords = words.map(w => {
-        const chunks = Utils.syllabifyWordChunks(w);
-        if(!chunks) return null;
-        const phon = perWordPhonetics[w.toLowerCase()] || null;
-        return { word: w, chunks, stressIndex: Utils.findStressIndex(phon, chunks.length) };
-      }).filter(Boolean);
-
-      card.syllableWords = syllableWords.length ? syllableWords : null;
-    }
-
-    if(trResult.ok){
-      card.meanings = mergeMeanings(rec.translation, trResult.text);
-    }else if(!trResult.notFound){
-      // genuine connection failure (not just "no translation available")
-      if(!rec.translation) card.networkFailed = true;
-    }
-
-    if(card.meanings.length === 0 && rec.translation){
-      card.meanings = [rec.translation];
-    }
-
-    // 例句翻译：只有查到例句才多发一次请求，失败也不影响卡片本身
-    if(card.example){
-      try{
-        const exTr = await TranslateService.translate(card.example);
-        if(exTr.ok) card.exampleZh = exTr.text;
-      }catch(e){ /* best-effort only */ }
-    }
-
-    return card;
-  }
-
-  // ============================================================
-  // Storage Service (localStorage, keyed by day)
-  // ============================================================
-  const StorageService = {
-    loadAll(){
-      try{
-        return JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY) || '[]');
-      }catch(e){ return []; }
-    },
-    saveAll(cards){
-      try{ localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(cards)); }catch(e){ /* ignore quota errors */ }
-    },
-    // 超过 HISTORY_DAYS（默认20天）的记录自动清除，保留最近20天
-    purgeOld(){
-      const all = this.loadAll();
-      const today = Utils.todayStr();
-      const kept = all.filter(c => {
-        const diff = Utils.dateDiffDays(today, c.dateAdded);
-        return diff >= 0 && diff < CONFIG.HISTORY_DAYS;
-      });
-      if(kept.length !== all.length) this.saveAll(kept);
-      return kept;
-    },
-    // 新整理的一批排在前面，同一批内部保持用户输入的原始顺序（稳定排序）
-    sortNewestFirst(cards){
-      return [...cards].sort((a,b) => (b.batchTime||0) - (a.batchTime||0));
-    },
-    todayCards(){
-      const today = Utils.todayStr();
-      return this.sortNewestFirst(this.purgeOld().filter(c => c.dateAdded === today));
-    },
-    cardsForDate(date){
-      return this.sortNewestFirst(this.purgeOld().filter(c => c.dateAdded === date));
-    },
-    // 返回所有出现过单词的日期，按时间倒序（今天在最前）
-    distinctDates(){
-      const dates = new Set(this.purgeOld().map(c => c.dateAdded));
-      return Array.from(dates).sort().reverse();
-    },
-    upsertMany(newCards, targetDate){
-      const all = this.loadAll();
-      const day = targetDate || Utils.todayStr();
-      const indexById = new Map(all.map((c,i)=>[c.id,i]));
-
-      for(const nc of newCards){
-        if(indexById.has(nc.id)){
-          // same word queried again on the same day: update info, keep the more complete data
-          const i = indexById.get(nc.id);
-          const old = all[i];
-          all[i] = {
-            ...nc,
-            meanings: nc.meanings.length >= old.meanings.length ? nc.meanings : old.meanings,
-            partsOfSpeech: nc.partsOfSpeech.length ? nc.partsOfSpeech : old.partsOfSpeech,
-            phonetic: nc.phonetic || old.phonetic,
-            syllableWords: nc.syllableWords || old.syllableWords,
-            example: nc.example || old.example,
-            exampleZh: nc.exampleZh || old.exampleZh
-          };
-        }else{
-          all.push(nc);
-          indexById.set(nc.id, all.length-1);
-        }
-      }
-      this.saveAll(all);
-      this.purgeOld();
-      return this.sortNewestFirst(all.filter(c => c.dateAdded === day));
-    },
-    updateOne(card){
-      const all = this.loadAll();
-      const i = all.findIndex(c => c.id === card.id);
-      if(i>=0) all[i] = card;
-      this.saveAll(all);
-    }
-  };
-
-  // ============================================================
-  // Text-to-speech
-  // ============================================================
-  const TTS = {
-    voice: null,
-    init(){
-      const pick = () => {
-        const voices = window.speechSynthesis.getVoices();
-        this.voice = voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang && v.lang.startsWith('en')) || null;
-      };
-      pick();
-      if(window.speechSynthesis.onvoiceschanged !== undefined){
-        window.speechSynthesis.onvoiceschanged = pick;
-      }
-    },
-    speak(text){
-      if(!('speechSynthesis' in window)) return;
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'en-US';
-      if(this.voice) utter.voice = this.voice;
-      utter.rate = 0.95;
-      window.speechSynthesis.speak(utter);
-    }
-  };
-  TTS.init();
-
-  // ============================================================
-  // UI Rendering
-  // ============================================================
-  const cardsContainer = document.getElementById('cardsContainer');
-  const emptyState = document.getElementById('emptyState');
-  const statsText = document.getElementById('statsText');
-  const processingText = document.getElementById('processingText');
-  const limitNotice = document.getElementById('limitNotice');
-  const filterInput = document.getElementById('filterInput');
-  const historyBar = document.getElementById('historyBar');
-
-  let currentCards = [];
-  let selectedDate = Utils.todayStr();
-
-  function renderHistoryBar(){
-    const dates = StorageService.distinctDates();
-    if(!dates.includes(selectedDate)) dates.unshift(selectedDate);
-    historyBar.innerHTML = dates.map(d => `
-      <button class="day-chip${d===selectedDate ? ' active':''}" data-date="${d}">${Utils.formatDateLabel(d)}</button>
-    `).join('');
-  }
-
-  historyBar.addEventListener('click', (e)=>{
-    const btn = e.target.closest('.day-chip');
-    if(!btn) return;
-    selectedDate = btn.dataset.date;
-    currentCards = StorageService.cardsForDate(selectedDate);
-    renderHistoryBar();
-    render();
-  });
-
-  function cardMatchesFilter(card, q){
-    if(!q) return true;
-    q = q.toLowerCase();
-    if(card.english.toLowerCase().includes(q)) return true;
-    if(card.meanings.some(m => m.toLowerCase().includes(q))) return true;
-    if(card.partsOfSpeech.some(p => p.toLowerCase().includes(q))) return true;
-    if(card.userTranslation && card.userTranslation.toLowerCase().includes(q)) return true;
-    return false;
-  }
-
-  function renderCardHtml(card){
-    const meaningsText = card.meanings.length ? Utils.escapeHtml(card.meanings.join('；')) : '<span style="color:var(--text-secondary)">暂无释义</span>';
-    const posText = Utils.abbreviatePOS(card.partsOfSpeech);
-
-    let spellingHtml = '';
-    if(card.spellingStatus === 'suspect' && card.spellingSuggestion){
-      spellingHtml = `
-        <div class="spelling-warn">
-          ⚠ 可能拼写错误
-          <div>建议修改为：<strong>${Utils.escapeHtml(card.spellingSuggestion)}</strong></div>
-          <div class="actions">
-            <button class="accept" data-action="use-suggestion" data-id="${card.id}">使用建议拼写</button>
-            <button data-action="keep-original" data-id="${card.id}">保留原输入</button>
+        <div class="practice-question">
+          <p class="practice-label" id="practiceLabel">根据提示拼写</p>
+          <div class="sentence-prompt hidden" id="sentencePrompt"></div>
+          <h3 id="practiceMeaning"></h3>
+          <p class="practice-word-hint" id="practiceWordHint"></p>
+          <div class="practice-help-actions">
+            <button class="speak practice-speak" id="practiceSpeak" aria-label="播放当前单词">▶ 听发音</button>
+            <button class="practice-hint hidden" id="practiceHint" type="button">提示 0/3</button>
           </div>
-        </div>`;
-    }else if(card.spellingStatus === 'unknown'){
-      spellingHtml = `<div class="spelling-unknown">暂时无法确认拼写</div>`;
-    }
-    // spelling 'correct' intentionally shows nothing to keep UI clean
-
-    // 读音 (IPA)
-    const phoneticField = card.phonetic ? `
-      <div class="field">
-        <div class="field-label">读音 (IPA)</div>
-        <div class="field-value mono">${Utils.escapeHtml(card.phonetic)}</div>
-      </div>` : '';
-
-    // 词性
-    const posField = posText ? `
-      <div class="field">
-        <div class="field-label">词性</div>
-        <div class="field-value">${Utils.escapeHtml(posText)}</div>
-      </div>` : '';
-
-    // 音节拆分：短语和单词统一处理，每个词一行；单音节词整词大写，重音音节高亮大写
-    let syllableField = '';
-    if(card.syllableWords && card.syllableWords.length){
-      const li = card.syllableWords.map(sw => {
-        if(sw.chunks.length === 1){
-          return `<li>${Utils.escapeHtml(sw.chunks[0].toUpperCase())}</li>`;
-        }
-        const parts = sw.chunks.map((chunk, i) => {
-          const text = Utils.escapeHtml(chunk);
-          return i === sw.stressIndex ? `<span class="stress">${text.toUpperCase()}</span>` : text;
-        });
-        return `<li>${parts.join('-')}</li>`;
-      }).join('');
-      const anyUnconfirmed = card.syllableWords.some(sw => sw.chunks.length > 1 && sw.stressIndex === null);
-      syllableField = `
-      <div class="field">
-        <div class="field-label">音节拆分${anyUnconfirmed ? '（部分重音未确认）' : ''}</div>
-        <ul class="syllable-list">${li}</ul>
-      </div>`;
-    }
-
-    // 中文意思
-    const meaningField = `
-      <div class="field">
-        <div class="field-label">中文意思</div>
-        <div class="field-value">${meaningsText}</div>
-      </div>`;
-
-    // 常见例句
-    const exampleField = card.example ? `
-      <div class="field">
-        <div class="field-label">常见例句</div>
-        <div class="example-block">
-          <div class="example-en">${Utils.escapeHtml(card.example)}</div>
-          ${card.exampleZh ? `<div class="example-zh">${Utils.escapeHtml(card.exampleZh)}</div>` : ''}
         </div>
-      </div>` : '';
 
-    let networkHtml = '';
-    if(card.networkFailed){
-      networkHtml = `
-        <div class="network-warn">网络词典暂时无法连接，稍后可重新查询。</div>
-        <button class="retry-btn" data-action="retry-network" data-id="${card.id}">重新查询</button>`;
-    }else if(card.dictNotFound && card.partsOfSpeech.length === 0){
-      networkHtml = `<div class="dict-notfound">词典未收录该词/短语，已保留你的翻译。</div>`;
-    }
+        <form class="practice-answer" id="practiceAnswerForm">
+          <input id="practiceInput" inputmode="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="输入英文答案" placeholder="输入英文">
+          <button type="submit">确认</button>
+        </form>
+        <div class="letter-guide" id="letterGuide" aria-live="polite"></div>
+        <p class="practice-feedback" id="practiceFeedback" aria-live="polite"></p>
+        <button class="text-button practice-skip" id="practiceSkip" type="button">暂时不会，显示答案并稍后再练</button>
+      </div>
 
-    return `
-      <div class="card" data-id="${card.id}">
-        <div class="card-row">
-          <div class="card-english">${Utils.escapeHtml(card.english)}</div>
-          <button class="speak-btn" data-action="speak" data-text="${Utils.escapeHtml(card.english)}" title="朗读">🔊</button>
-        </div>
-        ${phoneticField}
-        ${posField}
-        ${syllableField}
-        ${meaningField}
-        ${exampleField}
-        ${spellingHtml}
-        ${networkHtml}
-      </div>`;
-  }
+      <div class="practice-result hidden" id="practiceResult">
+        <span class="result-mark">✓</span>
+        <p class="section-kicker">SESSION COMPLETE</p>
+        <h2>这一轮完成了</h2>
+        <div class="result-stats"><div><b id="resultAccuracy">0%</b><small>首次正确</small></div><div><b id="resultCorrect">0</b><small>答对</small></div><div><b id="resultReview">0</b><small>错词回练</small></div></div>
+        <p id="resultMessage"></p>
+        <div class="result-actions"><button class="action primary full" id="practiceAgain"><strong>再练一轮</strong></button><button class="secondary-button" id="practiceDone">完成</button></div>
+      </div>
+    </section>
+  </div>
 
-  function render(){
-    const q = filterInput.value.trim();
-    const visible = currentCards.filter(c => cardMatchesFilter(c, q));
+  <template id="wordCardTemplate">
+    <article class="word-card"><div class="sequence"></div><div class="word-content"><div class="word-topline"><div><h3 class="word"></h3><p class="syllables"></p></div><div class="card-actions"><button class="speak" aria-label="播放发音">▶</button><button class="delete-card" aria-label="删除这张卡片">×</button></div></div><p class="meaning"></p><div class="word-meta"><span class="source"></span><span class="confidence"></span></div></div></article>
+  </template>
+  <div class="toast" id="toast" role="status"></div>
 
-    if(currentCards.length === 0){
-      emptyState.style.display = 'block';
-      emptyState.textContent = selectedDate === Utils.todayStr()
-        ? '今天还没有单词，先在上方输入一些试试吧。'
-        : `${Utils.formatDateLabel(selectedDate)}没有单词记录。`;
-      cardsContainer.innerHTML = '';
-    }else{
-      emptyState.style.display = 'none';
-      cardsContainer.innerHTML = visible.map(renderCardHtml).join('');
-    }
-    const dayLabel = Utils.formatDateLabel(selectedDate);
-    statsText.textContent = `${dayLabel}单词：${currentCards.length} 条` + (q ? `（筛选出 ${visible.length} 条）` : '');
-  }
-
-  // event delegation for card actions
-  cardsContainer.addEventListener('click', (e)=>{
-    const btn = e.target.closest('[data-action]');
-    if(!btn) return;
-    const action = btn.dataset.action;
-
-    if(action === 'speak'){
-      TTS.speak(btn.dataset.text);
-    }else if(action === 'use-suggestion'){
-      const id = btn.dataset.id;
-      const card = currentCards.find(c=>c.id===id);
-      if(card && card.spellingSuggestion){
-        card.english = card.spellingSuggestion;
-        card.spellingStatus = 'correct';
-        card.spellingSuggestion = null;
-        StorageService.updateOne(card);
-        render();
-      }
-    }else if(action === 'keep-original'){
-      const id = btn.dataset.id;
-      const card = currentCards.find(c=>c.id===id);
-      if(card){
-        card.spellingStatus = 'correct'; // user confirmed, stop nagging
-        StorageService.updateOne(card);
-        render();
-      }
-    }else if(action === 'retry-network'){
-      const id = btn.dataset.id;
-      const card = currentCards.find(c=>c.id===id);
-      if(card){
-        btn.textContent = '查询中...';
-        btn.disabled = true;
-        buildCard({ english: card.english, translation: card.userTranslation }, card.dateAdded, card.batchTime)
-          .then(freshCard => {
-            freshCard.id = card.id; // keep identity stable
-            StorageService.updateOne(freshCard);
-            const idx = currentCards.findIndex(c=>c.id===id);
-            if(idx>=0) currentCards[idx] = freshCard;
-            render();
-          });
-      }
-    }
-  });
-
-  filterInput.addEventListener('input', ()=> render());
-
-  // ============================================================
-  // App controller
-  // ============================================================
-  const inputArea = document.getElementById('inputArea');
-  const processBtn = document.getElementById('processBtn');
-
-  async function handleProcess(){
-    const text = inputArea.value;
-    const { records, truncated } = Parser.parseInput(text);
-
-    limitNotice.classList.toggle('show', truncated);
-
-    if(records.length === 0){
-      processingText.textContent = '';
-      return;
-    }
-
-    processBtn.disabled = true;
-    let done = 0;
-    processingText.textContent = `正在整理 0/${records.length}...`;
-    const batchTime = Date.now(); // 这一整批共用一个时间戳，保证新批次整体排在前面
-
-    const builtCards = await runPool(records, async (rec)=>{
-      const card = await buildCard(rec, undefined, batchTime);
-      done++;
-      processingText.textContent = `正在整理 ${done}/${records.length}...`;
-      return card;
-    }, CONFIG.CONCURRENCY);
-
-    selectedDate = Utils.todayStr();
-    currentCards = StorageService.upsertMany(builtCards);
-    processingText.textContent = '';
-    processBtn.disabled = false;
-    renderHistoryBar();
-    render();
-  }
-
-  processBtn.addEventListener('click', handleProcess);
-
-  // ============================================================
-  // Init
-  // ============================================================
-  function init(){
-    currentCards = StorageService.todayCards();
-    renderHistoryBar();
-    render();
-  }
-  init();
-
-})();
-</script>
+  <script src="./vendor/hypher/hypher.js"></script>
+  <script src="./vendor/hypher/en-us.js"></script>
+  <script src="./vendor/tesseract/tesseract.min.js"></script>
+  <script src="./app.js?v=20260823-practice-v2"></script>
 </body>
 </html>

@@ -1,0 +1,10 @@
+{
+  "name": "英语单词小词典",
+  "short_name": "单词小词典",
+  "description": "课堂拍照提取记号笔单词，自动生成卡片并通过海怪打字和句子拼读快速练习",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#090a0d",
+  "theme_color": "#090a0d",
+  "lang": "zh-CN"
+}
