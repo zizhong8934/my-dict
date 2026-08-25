@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>英语单词小词典</title>
-  <link rel="stylesheet" href="./styles.css?v=20260823-practice-v2">
+  <link rel="stylesheet" href="./styles.css?v=20260825-date-batch-phrase">
 </head>
 <body>
   <main class="app-shell">
@@ -47,12 +47,18 @@
     </section>
 
     <section class="view" id="todayView" data-view="today">
-      <div class="page-heading"><p class="section-kicker">TODAY</p><h2>今日单词</h2><p id="todaySummary">今天还没有保存单词。</p></div>
+      <div class="page-heading"><p class="section-kicker">DATE REVIEW</p><h2 id="selectedDayTitle">今日单词</h2><p id="todaySummary">今天还没有保存单词。</p></div>
+      <div class="date-picker" aria-label="选择要查看和练习的日期">
+        <button id="previousRecordDay" type="button" aria-label="上一条有记录的日期">‹</button>
+        <label><span>查看日期</span><input id="practiceDate" type="date"></label>
+        <button id="nextRecordDay" type="button" aria-label="下一条有记录的日期">›</button>
+        <button class="date-today" id="selectToday" type="button">今天</button>
+      </div>
       <div class="card-list" id="todayCards"></div>
       <section class="practice-entry" id="practiceEntry">
         <div class="practice-entry-copy">
           <p class="section-kicker">QUICK PRACTICE</p>
-          <h2>今天的词，马上练一遍</h2>
+          <h2 id="practiceEntryTitle">这一天的词，马上练一遍</h2>
           <p id="practiceSummary">录入单词后即可开始，错词会自动再出现。</p>
         </div>
         <div class="practice-actions">
@@ -64,7 +70,7 @@
           <button class="practice-mode sentence" id="startSentenceGame">
             <span class="practice-icon">▤</span>
             <strong>句子拼读</strong>
-            <small>把今日生词填回句子</small>
+            <small>把所选日期生词填回句子</small>
           </button>
         </div>
       </section>
@@ -87,7 +93,7 @@
 
   <nav class="bottom-nav" aria-label="主导航">
     <button class="nav-item active" data-target="classroom"><span>◉</span><small>课堂</small></button>
-    <button class="nav-item" data-target="today"><span>▤</span><small>今日</small></button>
+    <button class="nav-item" data-target="today"><span>▤</span><small>日期</small></button>
     <button class="nav-item" data-target="library"><span>▥</span><small>词库</small></button>
     <button class="nav-item" data-target="settings"><span>⚙</span><small>设置</small></button>
   </nav>
@@ -105,12 +111,12 @@
   <div class="practice-backdrop hidden" id="practiceModal">
     <section class="practice-shell" role="dialog" aria-modal="true" aria-labelledby="practiceTitle">
       <header class="practice-head">
-        <div><p class="section-kicker" id="practiceKicker">QUICK PRACTICE</p><h2 id="practiceTitle">今日速练</h2></div>
+        <div><p class="section-kicker" id="practiceKicker">QUICK PRACTICE</p><h2 id="practiceTitle">按日期速练</h2></div>
         <button class="icon-button" id="closePracticeButton" aria-label="退出练习">×</button>
       </header>
 
       <div class="practice-menu" id="practiceMenu">
-        <p>只使用今天录入的单词。重复词保留，答错的词会在本轮末尾再次出现。</p>
+        <p id="practiceMenuDescription">使用所选日期录入的全部单词。重复词保留，答错的词会在本轮末尾再次出现。</p>
         <div class="practice-menu-grid">
           <button class="practice-menu-card typing" id="menuTypingGame"><span>⌨</span><strong>海怪速击</strong><small>根据中文和音节拼出英文，输入完成即可击退。</small></button>
           <button class="practice-menu-card sentence" id="menuSentenceGame"><span>▤</span><strong>句子拼读</strong><small>今天的生词会进入短句，拼写正确后自动读出整句。</small></button>
@@ -166,6 +172,6 @@
   <script src="./vendor/hypher/hypher.js"></script>
   <script src="./vendor/hypher/en-us.js"></script>
   <script src="./vendor/tesseract/tesseract.min.js"></script>
-  <script src="./app.js?v=20260823-practice-v2"></script>
+  <script src="./app.js?v=20260825-date-batch-phrase"></script>
 </body>
 </html>

@@ -4,6 +4,22 @@
   const STORE_KEY = "my-dict-v2-cards";
   const PRACTICE_KEY = "my-dict-v2-practice";
   const MAX_IMAGE_SIDE = 2200;
+  const PHRASE_MEANINGS = new Map([
+    ["look forward to", "期待；盼望"], ["take care of", "照顾；负责处理"], ["in charge of", "负责；主管"],
+    ["be able to", "能够；会"], ["as soon as", "一……就……；尽快"], ["at least", "至少"],
+    ["a lot of", "许多；大量"], ["according to", "根据；按照"], ["instead of", "代替；而不是"],
+    ["because of", "因为；由于"], ["such as", "例如；诸如"], ["for example", "例如"],
+    ["pay attention to", "注意；留意"], ["get along with", "与……相处；进展"], ["make sure", "确保；查明"],
+    ["used to", "过去常常"], ["be used to", "习惯于；被用于"], ["depend on", "依靠；取决于"],
+    ["deal with", "处理；应对"], ["find out", "查明；发现"], ["put on", "穿上；播放；上演"],
+    ["take off", "脱下；起飞"], ["turn on", "打开"], ["turn off", "关闭"], ["pick up", "捡起；接人；学会"],
+    ["go through", "经历；检查；完成"], ["carry out", "执行；实施"], ["set up", "建立；安装"],
+    ["work out", "解决；锻炼；计算出"], ["come up with", "想出；提出"], ["on time", "准时"],
+    ["in time", "及时"], ["in order to", "为了"], ["by the way", "顺便说一下"],
+    ["right away", "立刻；马上"], ["no longer", "不再"], ["all kinds of", "各种各样的"],
+    ["tape measure", "卷尺"], ["safety glasses", "护目镜"], ["circular saw", "圆锯"],
+    ["drywall screw", "石膏板螺钉"], ["power drill", "电钻"], ["utility knife", "美工刀；工具刀"]
+  ]);
   const state = {
     cards: loadCards(),
     latest: [],
@@ -14,6 +30,7 @@
     cancelled: false,
     practice: loadPracticeRecords(),
     game: null,
+    selectedDay: localDateKey(new Date()),
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -31,6 +48,7 @@
     practiceMeaning: $("#practiceMeaning"), practiceWordHint: $("#practiceWordHint"), sentencePrompt: $("#sentencePrompt"),
     letterGuide: $("#letterGuide"), miniMonster: $("#miniMonster"), monsterStage: $("#monsterStage"),
     practiceHint: $("#practiceHint"),
+    practiceDate: $("#practiceDate"), selectedDayTitle: $("#selectedDayTitle"),
   };
 
   let hyphenator = null;
@@ -42,6 +60,7 @@
 
   bindEvents();
   renderAll();
+  refreshStoredPhraseMeanings().catch(() => {});
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(() => {});
 
   function bindEvents() {
@@ -69,6 +88,10 @@
     $("#practiceSpeak").addEventListener("click", speakPracticePrompt);
     ui.practiceHint.addEventListener("click", usePracticeHint);
     ui.practiceInput.addEventListener("input", renderLetterGuide);
+    ui.practiceDate.addEventListener("change", () => setSelectedDay(ui.practiceDate.value));
+    $("#previousRecordDay").addEventListener("click", () => moveToRecordDay(-1));
+    $("#nextRecordDay").addEventListener("click", () => moveToRecordDay(1));
+    $("#selectToday").addEventListener("click", () => setSelectedDay(localDateKey(new Date())));
     $$(".nav-item").forEach((button) => button.addEventListener("click", () => showView(button.dataset.target)));
   }
 
@@ -104,7 +127,7 @@
           word: row.word,
           meaning: row.meaning || dictionaryMeaning(dictionary),
           phonetic: dictionary?.phonetic || "",
-          source: row.meaning ? "你输入的中文" : dictionary ? "本地词典" : "等待补充释义",
+          source: row.meaning ? "你输入的中文" : dictionary ? (row.word.includes(" ") ? "本地短语词典" : "本地词典") : (row.word.includes(" ") ? "短语释义待补充" : "等待补充释义"),
           confidence: 100,
           needsReview: !row.meaning && !dictionary,
           origin: "manual",
@@ -682,8 +705,10 @@
   function centerY(item) { return (item.bbox.y0 + item.bbox.y1) / 2; }
 
   async function lookupDictionary(rawWord, fuzzy = false, exactOnly = false) {
-    const normalized = rawWord.toLowerCase().trim();
-    if (!/^[a-z][a-z'-]*$/.test(normalized)) return null;
+    const normalized = String(rawWord).toLowerCase().trim().replace(/[’‘]/g, "'").replace(/\s+/g, " ");
+    // ECDICT 本身收录了大量完整短语。旧规则只允许单词，遇到空格就直接退出，
+    // 导致 "look forward to" 之类明明在本地词库里却显示查不到。
+    if (!/^[a-z](?:[a-z' -]*[a-z])?$/.test(normalized)) return null;
     const key = shardKey(normalized);
     let map = state.shardMaps.get(key);
     if (!map) {
@@ -698,7 +723,8 @@
       }
       map = await promise;
     }
-    if (fuzzy) {
+    const isPhrase = normalized.includes(" ");
+    if (fuzzy && !isPhrase) {
       const transformed = [];
       if (/^go[a-z]{4,}$/.test(normalized)) transformed.push(normalized.slice(2));
       if (/^(?:[a-z])(?!$)/.test(normalized)) transformed.push(normalized.slice(1));
@@ -708,9 +734,19 @@
         if (found) return found;
       }
     }
-    const variants = [normalized.replace(/'s$/, ""), normalized.replace(/ies$/, "y"), normalized.replace(/es$/, ""), normalized.replace(/s$/, ""), normalized.replace(/ing$/, ""), normalized.replace(/ed$/, "")];
     const direct = map.get(normalized);
     if (direct && exactOnly) return direct;
+    if (isPhrase) {
+      // 完整短语永远优先，不允许退化成其中某个单词的释义。
+      if (direct) return direct;
+      if (PHRASE_MEANINGS.has(normalized)) return { word: normalized, phonetic: "", translation: PHRASE_MEANINGS.get(normalized), definition: "", rank: 1 };
+      const words = normalized.split(" ");
+      const head = words[0];
+      const headVariants = wordVariants(head).filter((word) => word !== head);
+      const phraseMatches = headVariants.map((word) => map.get([word, ...words.slice(1)].join(" "))).filter(Boolean);
+      return phraseMatches[0] || null;
+    }
+    const variants = wordVariants(normalized);
     const alternatives = variants.map((variant) => map.get(variant)).filter(Boolean);
     if (direct) {
       const commonVariant = alternatives.filter((entry) => entry.rank > 0).sort((a, b) => a.rank - b.rank)[0];
@@ -731,6 +767,13 @@
       if (best) return best;
     }
     return null;
+  }
+
+  function wordVariants(word) {
+    const values = [word, word.replace(/'s$/, ""), word.replace(/ies$/, "y"), word.replace(/ied$/, "y"), word.replace(/ves$/, "f"), word.replace(/es$/, ""), word.replace(/s$/, ""), word.replace(/ing$/, ""), word.replace(/ed$/, "")];
+    if (/ing$/.test(word)) values.push(word.slice(0, -3) + "e");
+    if (/ed$/.test(word)) values.push(word.slice(0, -1));
+    return [...new Set(values.filter(Boolean))];
   }
 
   async function lookupWithAddedLeadingLetter(word) {
@@ -761,8 +804,28 @@
 
   function dictionaryMeaning(entry) {
     if (!entry) return "释义待补充";
-    const chinese = String(entry.translation || "").split(/\\n|\n/).map((part) => part.trim()).filter(Boolean).slice(0, 3).join("；");
+    const preferred = PHRASE_MEANINGS.get(String(entry.word || "").toLowerCase().trim().replace(/\s+/g, " "));
+    if (preferred) return preferred;
+    const chinese = String(entry.translation || "")
+      .replace(/\[(?:网络|法|计|医|化|机|经|俚|口)\]/g, "")
+      .split(/\\n|\n/).map((part) => part.trim()).filter(Boolean).slice(0, 3).join("；")
+      .replace(/^(?:n|v|vt|vi|adj|adv|prep|conj|pron|num|art|phr)\.\s*/i, "")
+      .replace(/\s*[;；]\s*/g, "；").replace(/；{2,}/g, "；").trim();
     return chinese || entry.definition || "释义待补充";
+  }
+
+  async function refreshStoredPhraseMeanings() {
+    let changed = false;
+    for (const card of state.cards) {
+      if (!String(card.word || "").includes(" ") || card.source === "你输入的中文") continue;
+      const dictionary = await lookupDictionary(card.word);
+      if (!dictionary) continue;
+      const meaning = dictionaryMeaning(dictionary);
+      if (meaning !== "释义待补充" && card.meaning !== meaning) { card.meaning = meaning; changed = true; }
+      if (card.needsReview) { card.needsReview = false; changed = true; }
+      if (card.origin === "manual" && card.source !== "本地短语词典") { card.source = "本地短语词典"; changed = true; }
+    }
+    if (changed) { saveCards(); renderAll(); }
   }
 
   function makeCard(data) {
@@ -802,44 +865,67 @@
     if (!cards.length) return;
     const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     cards.forEach((card) => { if (!card.batchId) card.batchId = batchId; });
-    state.latest.push(...cards);
+    // 新录入的一批整体放到前面；批内仍按用户输入/照片阅读顺序排列。
+    state.latest = cards.concat(state.latest);
     state.cards.push(...cards);
+    state.selectedDay = localDateKey(new Date(cards[0].createdAt));
     saveCards();
     renderAll();
   }
 
+  function getCardsForDay(day = state.selectedDay) {
+    return sortNewestBatchFirst(state.cards.filter((card) => localDateKey(new Date(card.createdAt)) === day));
+  }
+
   function getTodayCards() {
-    const today = localDateKey(new Date());
-    return state.cards.filter((card) => localDateKey(new Date(card.createdAt)) === today);
+    return getCardsForDay(state.selectedDay);
+  }
+
+  function batchKey(card) {
+    if (card.batchId) return card.batchId;
+    // 兼容升级前没有 batchId 的旧记录：十分钟内连续产生的卡片视作同一批。
+    const time = new Date(card.createdAt).getTime();
+    return `legacy-${Math.floor(time / (10 * 60 * 1000))}`;
+  }
+
+  function sortNewestBatchFirst(cards) {
+    const groups = new Map();
+    cards.forEach((card, sourceIndex) => {
+      const key = batchKey(card);
+      if (!groups.has(key)) groups.set(key, { key, cards: [], time: 0 });
+      const group = groups.get(key);
+      group.cards.push({ card, sourceIndex });
+      group.time = Math.max(group.time, new Date(card.createdAt).getTime() || 0);
+    });
+    return [...groups.values()].sort((a, b) => b.time - a.time).flatMap((group) => group.cards
+      .sort((a, b) => (Number(a.card.order) - Number(b.card.order)) || a.sourceIndex - b.sourceIndex)
+      .map((item) => item.card));
   }
 
   function getPracticeCards() {
-    const todayCards = getTodayCards();
-    const latestToday = state.latest.filter((card) => localDateKey(new Date(card.createdAt)) === localDateKey(new Date()));
-    if (latestToday.length) return latestToday.slice(-24);
-    const last = todayCards[todayCards.length - 1];
-    if (!last) return [];
-    if (last.batchId) return todayCards.filter((card) => card.batchId === last.batchId).slice(-24);
-    const lastTime = new Date(last.createdAt).getTime();
-    return todayCards.filter((card) => lastTime - new Date(card.createdAt).getTime() <= 10 * 60 * 1000).slice(-24);
+    // 游戏使用用户所选日期的全部单词，新批次先练、批内顺序不变，重复词保留。
+    return getCardsForDay(state.selectedDay);
   }
 
   function renderPracticeEntry(cards = getPracticeCards()) {
     const disabled = cards.length === 0;
     $("#startTypingGame").disabled = disabled;
     $("#startSentenceGame").disabled = disabled;
-    const todaySessions = state.practice.daily?.[localDateKey(new Date())]?.sessions || 0;
+    const selectedSessions = state.practice.cardDays?.[state.selectedDay]?.sessions || 0;
     const minutes = Math.max(1, Math.ceil(cards.length * 18 / 60));
+    const label = displayDay(state.selectedDay);
+    $("#practiceEntryTitle").textContent = `${label}的词，马上练一遍`;
     $("#practiceSummary").textContent = disabled
-      ? "录入单词后即可开始，错词会自动再出现。"
-      : `最近一批 ${cards.length} 个词 · 每轮约 ${minutes} 分钟${todaySessions ? ` · 今天已练 ${todaySessions} 轮` : ""}`;
+      ? `${label}没有单词记录，请选择其他日期。`
+      : `${label}共 ${cards.length} 个词 · 每轮约 ${minutes} 分钟${selectedSessions ? ` · 这组已练 ${selectedSessions} 轮` : ""}`;
   }
 
   function openPractice(mode) {
     const cards = getPracticeCards();
-    if (!cards.length) return toast("请先录入今天的单词");
+    if (!cards.length) return toast("所选日期没有单词，请换一天");
     ui.practiceModal.classList.remove("hidden");
     document.body.classList.add("practice-open");
+    $("#practiceMenuDescription").textContent = `使用${displayDay(state.selectedDay)}录入的全部单词。重复词保留，答错的词会在本轮末尾再次出现。`;
     if (mode) startPractice(mode);
     else showPracticePanel("menu");
   }
@@ -877,10 +963,11 @@
       locked: false,
       hintLevel: 0,
       hintsUsed: 0,
+      cardDay: state.selectedDay,
     };
     $("#practiceKicker").textContent = mode === "typing" ? "MONSTER TYPING" : "SENTENCE SPELLING";
     $("#practiceTitle").textContent = mode === "typing" ? "海怪速击" : "句子拼读";
-    $("#practiceMenuNote").textContent = `最近一批共 ${cards.length} 个词，重复词会按原顺序继续出现。`;
+    $("#practiceMenuNote").textContent = `${displayDay(state.selectedDay)}共 ${cards.length} 个词；新批次在前，每批内部仍按录入顺序。`;
     ui.monsterStage.classList.toggle("sentence-mode", mode === "sentence");
     showPracticePanel("play");
     renderPracticeQuestion();
@@ -1021,13 +1108,19 @@
     state.practice.daily[day].sessions += 1;
     state.practice.daily[day].correct += game.correct;
     state.practice.daily[day].missed += game.missed;
+    state.practice.cardDays ||= {};
+    const cardDay = game.cardDay || state.selectedDay;
+    state.practice.cardDays[cardDay] ||= { sessions: 0, correct: 0, missed: 0 };
+    state.practice.cardDays[cardDay].sessions += 1;
+    state.practice.cardDays[cardDay].correct += game.correct;
+    state.practice.cardDays[cardDay].missed += game.missed;
     savePracticeRecords();
     $("#resultAccuracy").textContent = `${accuracy}%`;
     $("#resultCorrect").textContent = String(game.correct);
     $("#resultReview").textContent = String(game.reviewIds.size);
     $("#resultMessage").textContent = game.reviewIds.size
-      ? `${game.reviewIds.size} 个不熟的词已经在本轮末尾重新练习。明天仍可从今日记录继续进入。`
-      : "这一轮没有遗漏；可以直接结束，也可以切换另一种玩法。";
+      ? `${game.reviewIds.size} 个不熟的词已经在本轮末尾重新练习。以后仍可重新选择这个日期继续。`
+      : "这一轮没有遗漏；可以直接结束，也可以选择其他日期或切换玩法。";
     $("#practiceProgressBar").style.width = "100%";
     showPracticePanel("result");
     renderPracticeEntry();
@@ -1155,10 +1248,10 @@
   }
 
   function loadPracticeRecords() {
-    const empty = { sessions: 0, answered: 0, correct: 0, missed: 0, lastAt: null, lastMode: null, words: {}, daily: {} };
+    const empty = { sessions: 0, answered: 0, correct: 0, missed: 0, lastAt: null, lastMode: null, words: {}, daily: {}, cardDays: {} };
     try {
       const value = JSON.parse(localStorage.getItem(PRACTICE_KEY) || "null");
-      return value && typeof value === "object" ? { ...empty, ...value, words: value.words || {}, daily: value.daily || {} } : empty;
+      return value && typeof value === "object" ? { ...empty, ...value, words: value.words || {}, daily: value.daily || {}, cardDays: value.cardDays || {} } : empty;
     } catch { return empty; }
   }
 
@@ -1167,27 +1260,43 @@
   }
 
   function renderAll() { renderLatest(); renderToday(); renderLibrary(); }
-  function renderLatest() { renderCards(ui.latestCards, state.latest); ui.latestEmpty.classList.toggle("hidden", state.latest.length > 0); }
+  function renderLatest() { renderCards(ui.latestCards, sortNewestBatchFirst(state.latest), { showBatches: true }); ui.latestEmpty.classList.toggle("hidden", state.latest.length > 0); }
   function renderToday() {
     const cards = getTodayCards();
-    ui.todaySummary.textContent = cards.length ? `今天共 ${cards.length} 张卡片；重复词按出现次数计算。` : "今天还没有保存单词。";
-    renderCards(ui.todayCards, cards);
+    const label = displayDay(state.selectedDay);
+    ui.selectedDayTitle.textContent = `${label}的单词`;
+    ui.todaySummary.textContent = cards.length ? `${label}共 ${cards.length} 张卡片；新批次在前，重复词按出现次数计算。` : `${label}没有保存单词。`;
+    renderDateControls();
+    renderCards(ui.todayCards, cards, { showBatches: true });
     renderPracticeEntry();
   }
   function renderLibrary() {
     const query = ui.librarySearch.value.trim().toLowerCase();
-    const cards = [...state.cards].reverse().filter((card) => !query || card.word.toLowerCase().includes(query) || card.meaning.includes(query));
+    const cards = sortNewestBatchFirst(state.cards).filter((card) => !query || card.word.toLowerCase().includes(query) || card.meaning.includes(query));
     ui.librarySummary.textContent = `本机共保存 ${state.cards.length} 张卡片${query ? `，找到 ${cards.length} 张` : ""}`;
     renderCards(ui.libraryCards, cards);
   }
 
-  function renderCards(container, cards) {
+  function renderCards(container, cards, options = {}) {
     container.replaceChildren();
+    const counts = new Map();
+    cards.forEach((card) => counts.set(batchKey(card), (counts.get(batchKey(card)) || 0) + 1));
+    let lastBatch = null, batchIndex = -1, indexInBatch = 0;
     cards.forEach((card, index) => {
+      const currentBatch = batchKey(card);
+      if (currentBatch !== lastBatch) {
+        lastBatch = currentBatch; batchIndex += 1; indexInBatch = 0;
+        if (options.showBatches) {
+          const heading = document.createElement("div");
+          heading.className = "batch-heading";
+          heading.innerHTML = `<b>${batchIndex === 0 ? "最新一批" : `更早第 ${batchIndex + 1} 批`}</b><span>${counts.get(currentBatch)} 张</span>`;
+          container.append(heading);
+        }
+      }
       const fragment = ui.template.content.cloneNode(true);
       const article = fragment.querySelector(".word-card");
       article.classList.toggle("needs-review", card.needsReview);
-      fragment.querySelector(".sequence").textContent = String(index + 1).padStart(2, "0");
+      fragment.querySelector(".sequence").textContent = String(options.showBatches ? indexInBatch + 1 : index + 1).padStart(2, "0");
       fragment.querySelector(".word").textContent = card.word;
       fragment.querySelector(".syllables").textContent = card.phonetic ? `${card.syllables}  /${card.phonetic}/` : card.syllables;
       fragment.querySelector(".meaning").textContent = card.meaning;
@@ -1196,6 +1305,7 @@
       fragment.querySelector(".speak").addEventListener("click", () => speak(card.word));
       fragment.querySelector(".delete-card").addEventListener("click", () => removeCard(card.id));
       container.append(fragment);
+      indexInBatch += 1;
     });
   }
 
@@ -1221,12 +1331,49 @@
     catch { return []; }
   }
   function saveCards() { localStorage.setItem(STORE_KEY, JSON.stringify(state.cards)); }
-  function localDateKey(date) { return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`; }
+  function localDateKey(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return localDateKey(new Date());
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+  function dateFromKey(key) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key));
+    return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date();
+  }
+  function displayDay(key) {
+    const date = dateFromKey(key), today = localDateKey(new Date());
+    if (key === today) return "今天";
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    if (key === localDateKey(yesterday)) return "昨天";
+    return `${date.getMonth() + 1}月${date.getDate()}日`;
+  }
+  function availableDays() {
+    return [...new Set(state.cards.map((card) => localDateKey(new Date(card.createdAt))))].sort();
+  }
+  function setSelectedDay(day) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day))) return;
+    const today = localDateKey(new Date());
+    state.selectedDay = day > today ? today : day;
+    renderToday();
+  }
+  function moveToRecordDay(direction) {
+    const days = availableDays();
+    const target = direction < 0 ? [...days].reverse().find((day) => day < state.selectedDay) : days.find((day) => day > state.selectedDay);
+    if (target) setSelectedDay(target);
+    else toast(direction < 0 ? "没有更早的单词记录" : "没有更新的单词记录");
+  }
+  function renderDateControls() {
+    const today = localDateKey(new Date()), days = availableDays();
+    ui.practiceDate.value = state.selectedDay;
+    ui.practiceDate.max = today;
+    $("#previousRecordDay").disabled = !days.some((day) => day < state.selectedDay);
+    $("#nextRecordDay").disabled = !days.some((day) => day > state.selectedDay);
+    $("#selectToday").disabled = state.selectedDay === today;
+  }
 
   function eraseAll() {
     if (!confirm("确定删除这台设备上的全部单词卡片吗？此操作不能撤销。")) return;
     state.cards = []; state.latest = [];
-    state.practice = { sessions: 0, answered: 0, correct: 0, missed: 0, lastAt: null, lastMode: null, words: {}, daily: {} };
+    state.practice = { sessions: 0, answered: 0, correct: 0, missed: 0, lastAt: null, lastMode: null, words: {}, daily: {}, cardDays: {} };
     saveCards(); savePracticeRecords(); renderAll(); toast("本机学习记录已删除");
   }
 
