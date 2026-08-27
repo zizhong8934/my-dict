@@ -150,10 +150,25 @@
       const chineseAt = line.search(/[\u3400-\u9fff]/);
       let word = chineseAt >= 0 ? line.slice(0, chineseAt) : line;
       let meaning = chineseAt >= 0 ? line.slice(chineseAt) : "";
-      word = word.replace(/[：:＝=—–,，;；]+$/g, "").trim().replace(/\s+/g, " ");
+      word = cleanCardWord(word);
       meaning = meaning.replace(/^[：:＝=—–,，;；\s]+/g, "").trim();
       return { word, meaning };
     }).filter((row) => /[a-z]/i.test(row.word));
+  }
+
+  function cleanCardWord(value) {
+    return String(value || "")
+      .normalize("NFKC")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .replace(/[’‘]/g, "'")
+      .replace(/[‐‑‒–—―]/g, "-")
+      .replace(/\u00a0/g, " ")
+      .trim()
+      .replace(/^[：:=,，;；|｜\s]+|[：:=,，;；|｜\s]+$/g, "")
+      .replace(/^-+\s*|\s*-+$/g, "")
+      .replace(/\s*-\s*/g, "-")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   async function scanFiles(fileList) {
@@ -196,7 +211,7 @@
     await worker.setParameters({ tessedit_pageseg_mode: "3" });
     const result = await worker.recognize(canvas, { rotateAuto: true }, { blocks: true, imageColor: true, tsv: true });
     if (state.cancelled) return;
-    setProgress(82, "正在筛选标记词", "按照从左到右、再从上到下的阅读顺序排列。", true);
+    setProgress(79, "正在筛选标记词", "按照从左到右、再从上到下的阅读顺序排列。", true);
     const processedCanvas = result.data.imageColor ? await canvasFromSource(result.data.imageColor) : canvas;
     if (result.data.imageColor) ui.scanPreview.src = result.data.imageColor;
     const imageData = processedCanvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, processedCanvas.width, processedCanvas.height);
@@ -213,7 +228,7 @@
         pass: "full",
       };
     }).filter((word) => (((word.highlightScore >= .15 && word.contrast >= .08) || word.pixelScore >= .16) && word.confidence >= 8) || (word.adaptiveScore >= .48 && word.confidence >= 1));
-    setProgress(78, "正在增强阴影区域", "对弯曲、阴影和浅色标记再识别一次。", true);
+    setProgress(80, "正在增强阴影区域", "对弯曲、阴影和浅色标记再识别一次。", true);
     const enhancedCanvas = enhanceTextCanvas(processedCanvas);
     const enhancedResult = await worker.recognize(enhancedCanvas, {}, { blocks: true, tsv: true });
     flattenOcrWords(enhancedResult.data.blocks).forEach((word) => {
@@ -829,13 +844,14 @@
   }
 
   function makeCard(data) {
+    const word = cleanCardWord(data.word);
     return {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       createdAt: new Date().toISOString(),
-      word: data.word,
+      word,
       meaning: data.meaning || "释义待补充",
       phonetic: data.phonetic || "",
-      syllables: syllabify(data.word),
+      syllables: syllabify(word),
       source: data.source,
       confidence: data.confidence,
       needsReview: Boolean(data.needsReview),
@@ -1031,6 +1047,7 @@
       return;
     }
     if (typed === expected) return completePracticeWord(true);
+    if (compactPracticeAnswer(typed) === compactPracticeAnswer(expected)) return completePracticeWord(true, true);
     game.wrongAttempts += 1;
     game.firstAttempt = false;
     ui.miniMonster.classList.remove("miss");
@@ -1046,7 +1063,7 @@
     missPracticeWord();
   }
 
-  function completePracticeWord(good) {
+  function completePracticeWord(good, acceptedFormatting = false) {
     const game = state.game;
     const item = currentPracticeItem();
     if (!game || !item || !good || game.locked) return;
@@ -1055,7 +1072,9 @@
     if (game.firstAttempt && item.retry === 0) game.firstCorrect += 1;
     recordPracticeAnswer(item.card, true);
     ui.practiceFeedback.className = "practice-feedback good";
-    ui.practiceFeedback.textContent = item.retry ? "已经记住，回练完成。" : "正确，击退成功。";
+    ui.practiceFeedback.textContent = acceptedFormatting
+      ? `拼写正确；标准写法：${item.card.word}`
+      : item.retry ? "已经记住，回练完成。" : "正确，击退成功。";
     ui.practiceInput.value = item.card.word;
     renderLetterGuide();
     ui.miniMonster.classList.remove("hit");
@@ -1228,7 +1247,11 @@
   }
 
   function normalizePracticeAnswer(value) {
-    return String(value).toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, " ").trim();
+    return cleanCardWord(value).toLowerCase();
+  }
+
+  function compactPracticeAnswer(value) {
+    return normalizePracticeAnswer(value).replace(/[\s'-]/g, "");
   }
 
   function practiceWordKey(card) { return normalizePracticeAnswer(card.word); }
@@ -1272,7 +1295,7 @@
   }
   function renderLibrary() {
     const query = ui.librarySearch.value.trim().toLowerCase();
-    const cards = sortNewestBatchFirst(state.cards).filter((card) => !query || card.word.toLowerCase().includes(query) || card.meaning.includes(query));
+    const cards = sortNewestBatchFirst(state.cards).filter((card) => !query || String(card.word || "").toLowerCase().includes(query) || String(card.meaning || "").includes(query));
     ui.librarySummary.textContent = `本机共保存 ${state.cards.length} 张卡片${query ? `，找到 ${cards.length} 张` : ""}`;
     renderCards(ui.libraryCards, cards);
   }
@@ -1295,10 +1318,11 @@
       }
       const fragment = ui.template.content.cloneNode(true);
       const article = fragment.querySelector(".word-card");
+      const syllables = card.syllables || syllabify(card.word);
       article.classList.toggle("needs-review", card.needsReview);
       fragment.querySelector(".sequence").textContent = String(options.showBatches ? indexInBatch + 1 : index + 1).padStart(2, "0");
       fragment.querySelector(".word").textContent = card.word;
-      fragment.querySelector(".syllables").textContent = card.phonetic ? `${card.syllables}  /${card.phonetic}/` : card.syllables;
+      fragment.querySelector(".syllables").textContent = card.phonetic ? `${syllables}  /${card.phonetic}/` : syllables;
       fragment.querySelector(".meaning").textContent = card.meaning;
       fragment.querySelector(".source").textContent = card.source;
       fragment.querySelector(".confidence").textContent = card.needsReview ? "待确认" : card.origin === "photo" ? `${card.confidence}%` : "已生成";
@@ -1327,7 +1351,21 @@
   }
 
   function loadCards() {
-    try { const value = JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); return Array.isArray(value) ? value : []; }
+    try {
+      const value = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
+      if (!Array.isArray(value)) return [];
+      let changed = false;
+      value.forEach((card) => {
+        const cleaned = cleanCardWord(card?.word);
+        if (cleaned && cleaned !== card.word) {
+          card.word = cleaned;
+          card.syllables = "";
+          changed = true;
+        }
+      });
+      if (changed) localStorage.setItem(STORE_KEY, JSON.stringify(value));
+      return value.filter((card) => /[a-z]/i.test(String(card?.word || "")));
+    }
     catch { return []; }
   }
   function saveCards() { localStorage.setItem(STORE_KEY, JSON.stringify(state.cards)); }
