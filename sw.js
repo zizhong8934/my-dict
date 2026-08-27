@@ -1,4 +1,4 @@
-const CACHE = "my-dict-v2-20260825-date-batch-phrase";
+const CACHE = "my-dict-v2-20260826-regression-fix";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest",
   "./vendor/hypher/hypher.js", "./vendor/hypher/en-us.js",
