@@ -376,6 +376,24 @@
     if(run.daily&&window.WORDTIDE_MEMORY)window.WORDTIDE_MEMORY.updateSession((run.dailyOffset|0)+run.i);
     run.build=null;run.mask=null;renderLesson();
   }
+  function needsFirstLook(it){
+    if(!run.daily)return false;
+    const p=prog(it);return !(p.ok>0||p.learn>0||p.spell>0||p.assemble>0||p.complete>0);
+  }
+  function firstLookInline(it){
+    const ex=it.ex&&it.ex[0]||[],sy=String(it.sy||'');
+    return '<div class="th-learning-inline"><div class="th-first-label">第一次认识 · 可以看着英文学习</div><h2 class="th-first-word">'+esc(it.w)+'</h2>'
+      +(sy&&sy!==it.w?'<div class="th-first-parts">'+esc(sy)+'</div>':'')
+      +'<div class="th-actions"><button id="thFirstHear">听单词</button><button id="thFirstSlow">慢速再听</button></div>'
+      +(ex[0]?'<details class="th-inline-example"><summary>展开例句</summary><b>'+esc(ex[0])+'</b><p>'+esc(ex[1]||'')+'</p><button id="thFirstSentence">听例句</button></details>':'')+'</div>';
+  }
+  function wireFirstLook(it){
+    const hear=document.getElementById('thFirstHear'),slow=document.getElementById('thFirstSlow'),sentence=document.getElementById('thFirstSentence');
+    if(hear)hear.onclick=()=>speakAt(it.w,.82);
+    if(slow)slow.onclick=()=>speakAt(it.w,.62);
+    if(sentence)sentence.onclick=()=>speakAt(it.ex[0][0],.78);
+  }
+
   function renderLesson(){
     const it=current();if(!it){summary();return}const mode=lessonMode(),isLearn=mode==="learn",isRecall=mode==="recall",isSent=mode==="sentence",isColo=mode==="colo",isListen=mode==="listen",isZh=mode==="zhpick",isPick=mode==="learn"||isListen,isAssemble=mode==="assemble"||isSent,isComplete=mode==="complete",isSpell=mode==="spell"||mode==="mistakes";
     run.qStartedAt=Date.now();
@@ -426,13 +444,16 @@
           +'<div class="th-feedback" id="thFeedback"></div>'
           +'<div class="th-actions"><button id="thHear">🔊 听发音</button><button class="th-main" id="thColoCheck">检查</button></div>';
     }
-    const title=isListen?"听音选义":isZh?"中文选词":isPick?"看图选义":isRecall?"图片回忆":isSent?"句子拼写":isColo?"词语搭配":isAssemble?"词块组装":isComplete?"补全空缺":"最终默写",label=isListen?'听音':isZh?'选词':isLearn?'认识':isSent?'拼句':isColo?'搭配':isAssemble?'组装':isComplete?'补全':'默写';
+    const firstLook=isLearn&&needsFirstLook(it);
+    if(firstLook)right=firstLookInline(it)+right.replace('四张图里，哪一张是这个意思？','先听读英文，再选出对应的图片。');
+    const title=firstLook?"认识并选图":isListen?"听音选义":isZh?"中文选词":isPick?"看图选义":isRecall?"图片回忆":isSent?"句子拼写":isColo?"词语搭配":isAssemble?"词块组装":isComplete?"补全空缺":"最终默写",label=isListen?'听音':isZh?'选词':isLearn?'认识':isSent?'拼句':isColo?'搭配':isAssemble?'组装':isComplete?'补全':'默写';
     /* 看图选义 / 中文选词没有照片（那张大图就是答案）。不加 th-solo 的话，
        内容会掉进两列网格的第一列里，右边空一半 —— 就是排版难看的根源。 */
     const solo=isPick||isZh;
     shell(title,'<div class="th-lesson-card'+(solo?' th-solo':'')+'">'
       +(solo?'':visual(it,label))
       +'<div class="th-quiz">'+right+info(it,true)+'</div></div>');
+    wireFirstLook(it);
     const hear=document.getElementById("thHear");if(hear)hear.onclick=()=>{const sentence=(it.ex&&it.ex[0]&&it.ex[0][0])||it.w;if(window.WT_AUDIO)window.WT_AUDIO.sequence([it.w,sentence],.78);else speakAt(it.w,.72)};
     if(isPick||isZh){
       document.getElementById("thPickGrid").querySelectorAll("[data-pick]").forEach(b=>{

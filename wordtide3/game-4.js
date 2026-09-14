@@ -121,6 +121,22 @@
     const selected=x.ref.themeId===S.themeSea?5:0,len=wordLength(x.ref),easy=Math.max(0,10-len),long=Math.max(0,len-9);
     return selected*100+life*35+easy*10-long*18;
   }
+  function mixStudyQueue(queue){
+    const fresh=queue.filter(x=>x.reason==='今日新词'),review=queue.filter(x=>x.reason!=='今日新词');
+    function randomize(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+    randomize(fresh);randomize(review);
+    const mixed=[];let last=null,streak=0;
+    while(fresh.length||review.length){
+      let isNew;
+      if(!fresh.length)isNew=false;else if(!review.length)isNew=true;
+      else if(!mixed.length)isNew=false;
+      else if(streak>=2)isNew=!last;
+      else isNew=Math.random()<fresh.length/(fresh.length+review.length);
+      mixed.push((isNew?fresh:review).pop());streak=last===isNew?streak+1:1;last=isNew;
+    }
+    return mixed;
+  }
+
   function buildDailyQueue(plan){
     plan=plan||"quick";const t=now(),all=catalog().map(ref=>({ref,st:getState(ref.wordId)})),due=all.filter(x=>x.st.status!=="new"&&x.st.dueAt<=t),fresh=all.filter(x=>x.st.status==="new"),soon=all.filter(x=>x.st.status!=="new"&&x.st.dueAt>t);
     due.sort((a,b)=>(b.st.lapses-a.st.lapses)||(a.st.dueAt-b.st.dueAt));soon.sort((a,b)=>a.st.dueAt-b.st.dueAt);
@@ -130,7 +146,7 @@
     if(plan==="review"&&!out.length)soon.slice(0,limit).forEach(add);
     const preferred=fresh.sort((a,b)=>newWordPriority(b)-newWordPriority(a)||wordLength(a.ref)-wordLength(b.ref));preferred.slice(0,newCap).forEach(add);
     if(out.length<limit&&plan!=="review")soon.forEach(add);
-    return {plan,queue:out,counts:{due:due.length,newWords:fresh.length,soon:soon.length,limit,newCap},estimateMinutes:Math.max(1,Math.round(out.length*.42))};
+    return {plan,queue:plan==="review"?out:mixStudyQueue(out),counts:{due:due.length,newWords:fresh.length,soon:soon.length,limit,newCap},estimateMinutes:Math.max(1,Math.round(out.length*.42))};
   }
   function buildBattleQueue(){
     const t=now(),all=catalog().map(ref=>({ref,st:getState(ref.wordId)})).filter(x=>x.st.status!=="new"&&(x.st.dueAt<=t||x.st.skills.spell>0||x.st.skills.battle>0));
