@@ -6,7 +6,7 @@
   function settings(){return {mode:S.themeSoundMode||'soft',rate:clamp(S.themeVoiceRate,.6,1.1,.82),volume:clamp(S.themeVoiceVolume,0,1,.9),voice:S.themeVoiceName||''}}
   function status(text){const el=document.getElementById('wtAudioStatus');if(el)el.textContent=text}
   function voices(){try{return window.speechSynthesis.getVoices().filter(v=>/^en(?:-|_)/i.test(v.lang)&&!/^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Junior|Organ|Ralph|Superstar|Trinoids|Whisper|Wobble|Zarvox)$/i.test(v.name))}catch{return []}}
-  function stop(){token++;try{window.speechSynthesis.cancel()}catch{}}
+  function stop(){token++;try{window.speechSynthesis.cancel()}catch{}window.WT_MUSIC?.duck(false)}
   function sequence(lines,rate){
     stop();const active=token,config=settings();
     if(config.volume===0)return;
@@ -15,13 +15,13 @@
     const available=voices();
     const chosen=available.find(v=>v.name===config.voice)||available.find(v=>v.localService&&/^(Samantha|Alex|Karen|Daniel)$/.test(v.name))||available.find(v=>v.localService&&/^en-US$/i.test(v.lang))||available[0];
     function next(){
-      if(active!==token||index>=queue.length){if(active===token)status('播放完成');return}
+      if(active!==token||index>=queue.length){if(active===token){status('播放完成');window.WT_MUSIC?.duck(false)}return}
       const utterance=new SpeechSynthesisUtterance(queue[index++]);
       utterance.lang=chosen?.lang||'en-US';if(chosen)utterance.voice=chosen;
       utterance.rate=clamp(config.rate*(rate||.82)/.82,.5,1.2,.82);utterance.volume=config.volume;
       utterance.onend=next;
-      utterance.onerror=e=>{if(active!==token)return;if(e.error!=='canceled'&&e.error!=='interrupted')status('朗读未完成：请换一个英语声音，或检查系统语音是否已下载。')};
-      status('正在播放…');window.speechSynthesis.speak(utterance);
+      utterance.onerror=e=>{if(active!==token)return;window.WT_MUSIC?.duck(false);if(e.error!=='canceled'&&e.error!=='interrupted')status('朗读未完成：请换一个英语声音，或检查系统语音是否已下载。')};
+      status('正在播放…');window.WT_MUSIC?.duck(true);try{window.speechSynthesis.speak(utterance)}catch{window.WT_MUSIC?.duck(false);status('朗读启动失败，请再次点击试听。')}
       if(window.speechSynthesis.paused)window.speechSynthesis.resume();
     }
     next();
