@@ -69,7 +69,7 @@
   function mark(it,type,ok,meta){
     const p=prog(it); p.last=Date.now();
     /* 自适应模式下，每答一题就升/降一档。这是"不会的练到会、会了的不再磨"的关键。 */
-    if(run&&run.mode==="adaptive")bumpLv(it,!!ok);
+    if(run&&run.mode==="adaptive"&&!(ok&&type==="assemble"&&p.assemble<1))bumpLv(it,!!ok);
     if(ok){p.ok=(p.ok|0)+1;p[type]=(p[type]|0)+1;S.themeMistakes[key(it)]=Math.max(0,mistakeCount(it)-1);}
     else{p.bad=(p.bad|0)+1;S.themeMistakes[key(it)]=mistakeCount(it)+1;}
     syncToOriginal(it,p);
@@ -175,26 +175,67 @@
     const cs=(it.chunks&&it.chunks.length)?it.chunks:[it.w];
     return cs.map((text,i)=>({id:i,text:text,word:0}));
   }
+  // Wrong letter blocks are choices, not syllable teaching material.
+  function assemblyOptions(correctParts, successes){
+    const parts=correctParts.map((p,id)=>({...p,id}));
+    const count=successes>=2?3:successes>=1?2:0;
+    const used=new Set(parts.map(p=>p.text.toLowerCase()));
+    const candidates=[];
+    function offer(text,word){
+      const normalized=text.toLowerCase();
+      if(!text||used.has(normalized))return;
+      used.add(normalized);candidates.push({text,word});
+    }
+    // Change one letter to make plausible near-misses, without duplicates.
+    for(const p of correctParts){
+      const chars=Array.from(p.text);
+      for(let i=0;i<chars.length;i++){
+        if(!/[a-z]/i.test(chars[i]))continue;
+        const alternatives=/[aeiou]/i.test(chars[i])?'aeiou':'rlnmts';
+        for(const letter of alternatives){
+          const next=chars.slice();next[i]=chars[i]===chars[i].toUpperCase()?letter.toUpperCase():letter;
+          offer(next.join(''),p.word);
+        }
+      }
+    }
+    for(const text of ['en','ing','er','ly','tion','un'])offer(text,0);
+    const extras=shuffle(candidates).slice(0,count);
+    for(const p of extras)parts.push({...p,id:parts.length});
+    return {parts,distractorCount:extras.length};
+  }
+  function assemblyInstruction(){
+    const b=run.build,n=b.distractorCount;
+    return n?'辨别组装：有 '+n+' 个干扰块。选出 '+b.correct.length+' 块，按顺序拼出英文；多余的不用选。'
+      :'基础组装：把字母块按正确顺序拼成英文。熟悉后会加入干扰块。';
+  }
+
   function ensureBuild(it){
     const sent=lessonMode()==="sentence";
     const k=(sent?"S:":"")+key(it);if(run.build&&run.build.key===k)return;
-    const parts=sent?sentParts(it):wordParts(it),correct=parts.map(x=>x.id),order=shuffle(correct);
+    const base=sent?sentParts(it):wordParts(it),correct=base.map(x=>x.id);
+    const options=sent?{parts:base,distractorCount:0}:assemblyOptions(base,prog(it).assemble|0);
+    const parts=options.parts,order=shuffle(parts.map(x=>x.id));
     if(order.length>1&&order.every((x,i)=>x===correct[i]))order.reverse();
-    run.build={key:k,parts,correct,order,selected:[]};
+    run.build={key:k,parts,correct,order,selected:[],distractorCount:options.distractorCount};
   }
   function renderBuildBoard(){
     const b=run.build,built=document.getElementById("thBuilt"),tiles=document.getElementById("thTiles");if(!b||!built||!tiles)return;
     built.classList.toggle("empty",!b.selected.length);
     built.innerHTML=b.selected.map((id,i)=>{const p=b.parts[id],prev=i?b.parts[b.selected[i-1]]:null;return (prev&&prev.word!==p.word?'<span class="th-word-gap"></span>':'')+'<button class="th-part" data-built="'+id+'">'+esc(p.text)+'</button>'}).join("");
     tiles.innerHTML=b.order.map(id=>'<button class="th-part '+(b.selected.includes(id)?'used':'')+'" data-tile="'+id+'">'+esc(b.parts[id].text)+'</button>').join("");
-    tiles.querySelectorAll("[data-tile]").forEach(x=>x.onclick=()=>{b.selected.push(Number(x.dataset.tile));renderBuildBoard()});
-    built.querySelectorAll("[data-built]").forEach((x,i)=>x.onclick=()=>{b.selected.splice(i,1);renderBuildBoard()});
+    tiles.querySelectorAll("[data-tile]").forEach(x=>x.onclick=()=>{const id=Number(x.dataset.tile);if(run.locked||b.selected.includes(id))return;
+      if(b.selected.length>=b.correct.length){toast("已经选满，点上方字母块或撤回一步再换选");return}
+      b.selected.push(id);renderBuildBoard()});
+    built.querySelectorAll("[data-built]").forEach((x,i)=>x.onclick=()=>{if(run.locked)return;b.selected.splice(i,1);renderBuildBoard()});
   }
   function checkAssembly(){
     if(!run||run.locked)return;
     const it=current(),b=run.build,fb=document.getElementById("thFeedback");if(!it||!b||!fb)return;
     if(b.selected.length<b.correct.length){fb.className="th-feedback bad";fb.textContent="还没有组装完整。";return}
-    const ok=b.selected.every((x,i)=>x===b.correct[i]);
+    const ok=b.selected.length===b.correct.length&&new Set(b.selected).size===b.selected.length&&b.selected.every((id,i)=>{
+      const actual=b.parts[id],expected=b.parts[b.correct[i]];
+      return actual&&actual.text===expected.text&&actual.word===expected.word;
+    });
     const sent=lessonMode()==="sentence",type=sent?"sentence":"assemble";
     const full=sent?((it.ex&&it.ex[0]&&it.ex[0][0])||it.w):it.w;
     if(ok){mark(it,type,true);run.ok++;soundCue("ok");fb.className="th-feedback ok";
@@ -203,7 +244,7 @@
       /* 拼对之后把整句读一遍 —— 拼是眼和手，读出来才进耳朵 */
       speakAt(full,sent?.82:.72);advanceAfter(advanceLesson,sent?1400:750)}
     else{mark(it,type,false);run.bad++;soundCue("bad");requeue(it);fb.className="th-feedback bad";
-      fb.textContent=sent?"顺序还不对，再拼一次。":"顺序还不对，重新组装一次。";
+      fb.textContent=sent?"顺序还不对，再拼一次。":(b.distractorCount?"选中了干扰块或顺序不对，再挑一次。":"顺序还不对，重新组装一次。");
       b.selected=[];renderBuildBoard()}
   }
   /* 不共字但极易混的几对，手写排掉。共字的靠下面的规则自动排除。 */
@@ -370,7 +411,8 @@
       run.mode==="daily"?(current()&&current()._exercise||"spell"):run.mode}
   function advanceLesson(){
     if(run.mode==="guided"){
-      const next={learn:"assemble",assemble:"complete",complete:"spell"}[run.phase];
+      const needsChallenge=run.phase==="assemble"&&(prog(current()).assemble|0)<2&&!(prog(current()).complete>0||prog(current()).spell>0);
+      const next=needsChallenge?"assemble":{learn:"assemble",assemble:"complete",complete:"spell"}[run.phase];
       if(next)run.phase=next;else{run.phase="learn";run.i++}
     }else run.i++;
     if(run.daily&&window.WORDTIDE_MEMORY)window.WORDTIDE_MEMORY.updateSession((run.dailyOffset|0)+run.i);
@@ -415,7 +457,7 @@
         +'</div><div class="th-feedback" id="thFeedback"></div>';
     }
     if(isRecall)right+='<div id="thRecallAsk"><h3>先在心里说出英文</h3><p>想好以后再翻开答案。</p><div class="th-actions"><button id="thReveal">翻开答案</button></div></div><div class="th-actions" id="thRecallGrade" style="display:none"><button id="thForgot">没想起</button><button id="thRemember" class="th-main">想起来了</button><button id="thHear">🔊 听发音</button></div>';
-    if(isAssemble)right+='<h2 class="th-build-title">'+esc(isSent?((it.ex&&it.ex[0]&&it.ex[0][1])||it.zh):it.zh)+'</h2>'+'<p class="th-build-sub">'+(isSent?'把意群按正确顺序拼成完整的句子。'+'意群是说话时成块出的单位，不是一个词一个词蹦。':'把音节或字母块按正确顺序组装成英文。')+'</p><div class="th-built empty" id="thBuilt"></div><div class="th-tiles" id="thTiles"></div><div class="th-feedback" id="thFeedback"></div><div class="th-actions"><button id="thHear">🔊 听发音</button><button id="thBuildUndo">撤回一步</button><button id="thBuildReset">重新排列</button><button class="th-main" id="thBuildCheck">检查顺序</button></div>';
+    if(isAssemble)right+='<h2 class="th-build-title">'+esc(isSent?((it.ex&&it.ex[0]&&it.ex[0][1])||it.zh):it.zh)+'</h2>'+'<p class="th-build-sub">'+(isSent?'把意群按正确顺序拼成完整的句子。'+'意群是说话时成块出的单位，不是一个词一个词蹦。':assemblyInstruction())+'</p><div class="th-built empty" id="thBuilt"></div><div class="th-tiles" id="thTiles"></div><div class="th-feedback" id="thFeedback"></div><div class="th-actions"><button id="thHear">🔊 听发音</button><button id="thBuildUndo">撤回一步</button><button id="thBuildReset">重新排列</button><button class="th-main" id="thBuildCheck">检查顺序</button></div>';
     if(isComplete)right+='<h2 class="th-build-title">'+esc(it.zh)+'</h2><p class="th-build-sub">只输入下划线缺少的字母，按从左到右的顺序补全。</p><div class="th-mask" id="thMask"></div><div class="th-mask-note" id="thMaskNote"></div><input class="th-spell-input" id="thCompleteInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="只输入缺少的字母"><div class="th-feedback" id="thFeedback"></div><div class="th-actions"><button id="thHear">🔊 听发音</button><button id="thCompleteHint">提示一个字母</button><button class="th-main" id="thCompleteCheck">检查补全</button></div>';
     if(isSpell)right+='<h2 class="th-build-title">'+esc(it.zh)+'</h2>'
       /* 照片是歧义的：一张锤子的图可以是 hammer / tool / nail / hit。
@@ -466,7 +508,7 @@
       }
     }
     if(isRecall){document.getElementById("thReveal").onclick=()=>{screen.querySelector(".th-answer").classList.add("show");document.getElementById("thRecallAsk").style.display="none";document.getElementById("thRecallGrade").style.display="flex"};document.getElementById("thForgot").onclick=()=>gradeRecall(false);document.getElementById("thRemember").onclick=()=>gradeRecall(true)}
-    if(isAssemble){renderBuildBoard();document.getElementById("thBuildUndo").onclick=()=>{run.build.selected.pop();renderBuildBoard()};document.getElementById("thBuildReset").onclick=()=>{run.build.selected=[];run.build.order=shuffle(run.build.order);renderBuildBoard()};document.getElementById("thBuildCheck").onclick=checkAssembly}
+    if(isAssemble){renderBuildBoard();document.getElementById("thBuildUndo").onclick=()=>{if(run.locked)return;run.build.selected.pop();renderBuildBoard()};document.getElementById("thBuildReset").onclick=()=>{if(run.locked)return;run.build.selected=[];run.build.order=shuffle(run.build.order);renderBuildBoard()};document.getElementById("thBuildCheck").onclick=checkAssembly}
     if(isComplete){renderMask();const input=document.getElementById("thCompleteInput");input.oninput=()=>{input.value=input.value.toLowerCase().replace(/[^a-z]/g,"").slice(0,run.mask.hidden.length);run.mask.typed=input.value;renderMask()};input.onkeydown=e=>{if(e.key==="Enter")checkComplete()};document.getElementById("thCompleteHint").onclick=giveCompleteHint;document.getElementById("thCompleteCheck").onclick=checkComplete;setTimeout(()=>input.focus(),50)}
     if(isColo){
       const c=run.colo;

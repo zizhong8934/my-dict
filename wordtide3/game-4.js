@@ -108,7 +108,7 @@
 
   function exerciseFor(ref,st){
     if(st.status==="new"||st.skills.recognize<1)return "learn";
-    if(st.skills.assemble<1)return "assemble";
+    if(st.skills.assemble<1||(st.skills.assemble<2&&st.skills.complete<1&&st.skills.spell<1))return "assemble";
     if(st.skills.complete<1)return "complete";
     if(st.skills.spell<1)return "spell";
     if(st.lapses>=2&&st.skills.complete<2)return "complete";
