@@ -1,6 +1,6 @@
-const CACHE = "my-dict-v2-20260826-regression-fix";
+const CACHE = "my-dict-v2-20260915-number-prefix";
 const APP_SHELL = [
-  "./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest",
+  "./", "./index.html", "./styles.css", "./app.js", "./app.js?v=20260915-number-prefix", "./manifest.webmanifest",
   "./vendor/hypher/hypher.js", "./vendor/hypher/en-us.js",
   "./vendor/tesseract/tesseract.min.js", "./vendor/tesseract/worker.min.js",
   "./vendor/tesseract/lang/eng_best.traineddata.gz",
@@ -13,7 +13,7 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith("my-dict-v2-") && key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
 });
 
 self.addEventListener("fetch", (event) => {

@@ -156,8 +156,16 @@
     }).filter((row) => /[a-z]/i.test(row.word));
   }
 
+  function stripListNumber(value) {
+    return String(value || "").normalize("NFKC")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "").trim()
+      // Require an explicit list delimiter and an English word after it.
+      // Preserve numbers in 3D, 24/7, 3.14, 7-up and phrases like 3 days.
+      .replace(/^(?:\(\s*\d{1,4}\s*\)|\[\s*\d{1,4}\s*\]|\d{1,4}\s*[.)、,:])\s*(?=[a-z])/i, "");
+  }
+
   function cleanCardWord(value) {
-    return String(value || "")
+    return stripListNumber(value)
       .normalize("NFKC")
       .replace(/[\u200B-\u200D\uFEFF]/g, "")
       .replace(/[’‘]/g, "'")
@@ -863,7 +871,7 @@
   }
 
   function syllabify(text) {
-    return String(text).split(/(\s+|-)/).map((part) => {
+    return cleanCardWord(text).split(/(\s+|-)/).map((part) => {
       if (!/[a-z]/i.test(part) || part.length < 4) return part;
       try {
         const pieces = hyphenator ? hyphenator.hyphenate(part) : [];
@@ -1166,7 +1174,7 @@
     const item = currentPracticeItem();
     if (!game || !item || !("speechSynthesis" in window)) return;
     speechSynthesis.cancel();
-    const text = game.mode === "sentence" && game.sentence ? game.sentence.spoken : item.card.word;
+    const text = game.mode === "sentence" && game.sentence ? game.sentence.spoken : cleanCardWord(item.card.word);
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
     utterance.rate = .78;
@@ -1344,7 +1352,7 @@
   function speak(word) {
     if (!("speechSynthesis" in window)) return toast("当前浏览器不支持发音");
     speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(word);
+    const utterance = new SpeechSynthesisUtterance(cleanCardWord(word));
     utterance.lang = "en-US";
     utterance.rate = .82;
     speechSynthesis.speak(utterance);
@@ -1358,12 +1366,19 @@
       value.forEach((card) => {
         const cleaned = cleanCardWord(card?.word);
         if (cleaned && cleaned !== card.word) {
+          if (stripListNumber(card.word) !== String(card.word).normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g, "").trim()) {
+            card.originalNumberedWord ||= card.word;
+          }
           card.word = cleaned;
           card.syllables = "";
           changed = true;
         }
       });
-      if (changed) localStorage.setItem(STORE_KEY, JSON.stringify(value));
+      // A full device must not make existing cards disappear on startup.
+      if (changed) {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(value)); }
+        catch (error) { console.warn("单词清理暂未保存，原记录仍保留", error); }
+      }
       return value.filter((card) => /[a-z]/i.test(String(card?.word || "")));
     }
     catch { return []; }
