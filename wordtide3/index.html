@@ -965,6 +965,77 @@ body:has(#scTheme.on) #cv{opacity:.28}
 @media(max-width:360px){#topbar .brand{max-width:94px;overflow:hidden}#topbar .brand img{max-width:80px}#topbar .pill{padding:6px 8px}#wtAudioButton{font-size:11px;padding:6px}#scTheme .th-head{column-gap:6px}#scTheme .th-head h1{font-size:20px}}
 @media(max-height:500px){#scTheme .th-photo-wrap{max-height:120px}#scTheme .th-panel{padding-top:12px}#scTheme .th-head{margin-bottom:0}#scTheme .th-spell-input{margin-top:8px}}
 
+body.ox-home-visible #topbar{display:none!important}
+#scHome.ox-ready{--ox-bg:#f2f8fd;--ox-card:#ffffffd9;--ox-ink:#0d2342;--ox-muted:#58708e;--ox-line:#dceaf6;--ox-blue:#087fff;--ox-glass:#e5f2ff;--ox-shadow:0 10px 35px #15568509;background:var(--ox-bg)!important;color:var(--ox-ink);padding:0 20px calc(90px + env(safe-area-inset-bottom))!important;overflow-x:hidden;width:100%;max-width:none;box-sizing:border-box;background-image:none!important}
+#scHome.ox-ready[data-appearance=dark]{--ox-bg:#08131e;--ox-card:#112433;--ox-ink:#f2f7ff;--ox-muted:#adbed0;--ox-line:#244052;--ox-glass:#132e47;--ox-shadow:0 10px 35px #00000012}
+#scHome.ox-ready>*:not(#oceanHome){display:none!important}
+#scHome.ox-ready.ox-legacy>.card:not(.entry):not(#oceanHome){display:block!important;max-width:760px;margin:16px auto;background:var(--ox-card);color:var(--ox-ink);border:1px solid var(--ox-line);box-shadow:none}
+#scHome.ox-legacy>.card .muted,#scHome.ox-legacy>.card .sub{color:var(--ox-muted)}
+#oceanHome{max-width:760px;margin:auto;color:var(--ox-ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif;font-size:16px;line-height:1.5}
+#oceanHome *{box-sizing:border-box}
+#oceanHome [hidden]{display:none!important}
+#oceanHome button{font:inherit;color:inherit;cursor:pointer;border:0;box-shadow:none;text-shadow:none;transform:none;letter-spacing:0;min-height:44px;white-space:normal;touch-action:manipulation}
+#oceanHome button:focus-visible{outline:3px solid #1687ff;outline-offset:4px}
+#oceanHome button:active{filter:brightness(.94)}
+#oceanHome svg{width:24px;height:24px;display:block;flex-shrink:0}
+#oceanHome h1,#oceanHome h2,#oceanHome p{margin:0;color:inherit;letter-spacing:0}
+#oceanHome h1{font-size:28px;font-weight:750;line-height:1.25}
+#oceanHome h2{font-size:20px;font-weight:700}
+#oceanHome h1:before,#oceanHome h2:before{display:none}
+.ox-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(22px + env(safe-area-inset-top)) 0 22px}
+.ox-brand{display:flex;align-items:center;gap:11px;min-width:0}
+.ox-brand b{display:block;font-size:21px;white-space:nowrap;line-height:1.3}.ox-brand b span{font-size:17px;color:#3070b9;margin-left:5px;font-weight:600}
+.ox-brand small{display:block;font-size:12px;color:var(--ox-muted);margin-top:4px}
+.ox-logo{display:block;width:42px;height:42px;border-radius:12px;overflow:hidden;position:relative;flex-shrink:0;background:#1687ff}
+.ox-logo img{position:absolute;max-width:none!important;width:124%;height:124%;left:-12%;top:-12%}
+.ox-head-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ox-wallet{display:flex;align-items:center;gap:5px;border-radius:30px;padding:5px 10px;background:var(--ox-glass);font-size:14px}.ox-wallet>span{color:#1687ff;font-size:21px}.ox-wallet b{max-width:85px;overflow:hidden;text-overflow:ellipsis}
+#oceanHome .ox-icon-button{border:1px solid var(--ox-line);border-radius:50%;width:42px;min-height:42px;padding:10px;background:var(--ox-card);color:var(--ox-muted)}
+#oceanHome .ox-icon-button svg{width:20px;height:20px}
+.ox-tide{position:relative;isolation:isolate;border-radius:24px;overflow:hidden;padding:24px 20px 18px;background-image:linear-gradient(0deg,#f8fcff 0%,#f8fcffb8 18%,transparent 53%),var(--tide-light);background-size:cover;background-position:center;box-shadow:var(--ox-shadow);min-height:285px;border:1px solid #ffffffa3}
+[data-appearance=dark] .ox-tide{background-image:linear-gradient(0deg,#0b2134 0%,#0b2134b0 16%,transparent 58%),var(--tide-dark);border-color:#1a4b6b}
+.ox-tide-copy{position:relative;z-index:1}.ox-tide-copy h1{margin-bottom:4px!important}.ox-due{font-weight:600}.ox-due strong{font-size:32px;letter-spacing:-1px}
+#oxEstimate{font-size:14px;margin-top:2px!important}
+#oceanHome .ox-round{position:absolute;right:20px;top:24px;width:40px;min-height:40px;border-radius:50%;background:#ffffff80;color:#2468aa;font-size:29px;padding:0;line-height:1}
+[data-appearance=dark] .ox-round{background:#d5ecff20!important;color:#d0e8ff!important}
+.ox-progress-area{margin-top:50px}.ox-progress-track{height:5px;border-radius:8px;background:#5f97bd33;overflow:hidden}.ox-progress-track i{display:block;height:100%;background:#1687ff;border-radius:inherit;transition:width .25s}
+.ox-progress-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--ox-muted);margin:10px 0 16px}.ox-progress-meta b{color:var(--ox-ink)}
+#oxPlanNote{background:#e4f4ffae;color:#186dc1;border-radius:20px;padding:3px 8px;font-size:12px}
+[data-appearance=dark] #oxPlanNote{background:#113954c0;color:#b5d6f5}
+#oceanHome .ox-primary{background:linear-gradient(110deg,#0079ff,#349cff);color:#fff;width:100%;border-radius:16px;padding:12px 20px;min-height:50px;font-weight:650;text-align:center}
+.ox-primary span{margin-left:12px;font-size:21px}
+.ox-main-grid,.ox-explore-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+#oceanHome .ox-mode{position:relative;background:linear-gradient(135deg,var(--ox-card) 50%,#91d7fc30);border:1px solid var(--ox-line);border-radius:22px;text-align:left;padding:18px;min-width:0;min-height:175px;box-shadow:var(--ox-shadow)}
+.ox-feature-icon{width:50px;height:50px;display:grid;place-items:center;border-radius:17px;background:linear-gradient(135deg,#83d9ff,#0085ff);color:#fff;border:1px solid #ffffff60;margin-bottom:12px}.ox-feature-icon svg{width:27px!important;height:27px!important}
+.ox-small-arrow{position:absolute;right:15px;top:20px;width:28px;height:28px;border-radius:50%;text-align:center;font-size:23px;line-height:25px;color:var(--ox-muted);background:var(--ox-glass)}
+#oceanHome .ox-mode p,#oceanHome .ox-explore p{font-size:14px;color:var(--ox-muted);margin-top:3px;line-height:1.55}
+.ox-section-title{display:flex;align-items:center;justify-content:space-between;margin:21px 0 10px}
+#oceanHome .ox-section-title h2{font-size:18px}
+#oceanHome .ox-section-title button{padding:0;background:none;font-size:14px;color:var(--ox-muted);min-height:32px}
+.ox-explore-grid{margin-top:0}
+#oceanHome .ox-explore{border-radius:20px;overflow:hidden;padding:17px 15px;text-align:left;min-width:0;min-height:156px;border:1px solid var(--ox-line);background-size:cover;background-position:center}
+.ox-island{background-image:linear-gradient(90deg,#eef9ffe8,#edf8ff9e 45%,transparent 85%),var(--explore-light)}
+.ox-boss{background-image:linear-gradient(90deg,#eef9fff0,#eef9ff9e 48%,transparent 85%),var(--boss-light)}
+[data-appearance=dark] .ox-island{background-image:linear-gradient(90deg,#0d2034ee,#0d203480 53%,transparent 88%),var(--explore-dark)}
+[data-appearance=dark] .ox-boss{background-image:linear-gradient(90deg,#0d2034ee,#0d203490 48%,transparent 88%),var(--boss-dark)}
+#oceanHome .ox-explore h2{font-size:18px}.ox-mini-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:11px;background:#9dd4ff33;color:#087fff;margin-bottom:10px}
+[data-appearance=dark] .ox-mini-icon{color:#85d1ff}
+.ox-shortcuts{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+#oceanHome .ox-shortcuts button{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;padding:14px 7px;background:var(--ox-card);border:1px solid var(--ox-line);border-radius:16px;font-size:13px}
+.ox-shortcuts svg{color:#1687ff;width:21px!important;height:21px!important}.ox-shortcuts button:first-child svg{color:#00ad8c}
+.ox-nav{position:fixed;z-index:80;bottom:0;left:0;right:0;display:flex;justify-content:space-around;padding:8px max(12px,calc((100vw - 760px)/2)) calc(8px + env(safe-area-inset-bottom));background:#f9fcfff2;border-top:1px solid var(--ox-line);backdrop-filter:blur(18px)}
+[data-appearance=dark] .ox-nav{background:#0c1a29f2}
+#oceanHome .ox-nav button{display:flex;flex-direction:column;align-items:center;gap:3px;border-radius:10px;flex:1;padding:4px;background:transparent;color:var(--ox-muted);font-size:12px;max-width:145px}
+#oceanHome .ox-nav .active{color:#0786ff;font-weight:650}
+.ox-secondary{padding:12px 0 20px}.ox-secondary>p{color:var(--ox-muted)!important;font-size:15px;margin:10px 0 22px!important}
+.ox-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}.ox-stat-grid>div{padding:20px;background:var(--ox-card);border:1px solid var(--ox-line);border-radius:20px}.ox-stat-grid span{font-size:14px;color:var(--ox-muted)}.ox-stat-grid strong{display:block;font-size:32px;margin-top:6px}
+.ox-settings-grid{display:grid;gap:12px}
+#oceanHome .ox-settings-grid button,#oceanHome .ox-secondary-button{background:var(--ox-card);border:1px solid var(--ox-line);border-radius:16px;text-align:left;padding:16px;width:100%}
+#oceanHome .ox-secondary-button{margin-top:14px}
+@media(min-width:680px){#oceanHome .ox-tide{min-height:330px;padding:30px}.ox-progress-area{margin-top:80px}.ox-main-grid,.ox-explore-grid{gap:20px}#oceanHome .ox-mode{padding:24px}.ox-header{padding-bottom:25px}}
+@media(max-width:390px){#scHome.ox-ready{padding-left:15px!important;padding-right:15px!important}.ox-brand{gap:8px}.ox-brand b{font-size:19px}.ox-brand b span{font-size:14px}.ox-brand small{font-size:11px}.ox-head-actions{gap:5px}.ox-wallet{padding:4px 7px;font-size:12px}.ox-header{gap:5px}.ox-logo{width:35px;height:35px;border-radius:10px}#oceanHome .ox-icon-button{width:36px;min-height:36px;padding:7px}.ox-progress-meta{flex-wrap:wrap}.ox-shortcuts{gap:7px}#oceanHome .ox-shortcuts button{flex-direction:column;gap:5px}.ox-main-grid,.ox-explore-grid{gap:10px}}
+@media(prefers-reduced-motion:reduce){.ox-progress-track i{transition:none}}
+
 </style>
 </head>
 <body>
@@ -1286,5 +1357,6 @@ body:has(#scTheme.on) #cv{opacity:.28}
 <script src="game-4.js?v=0226d4200a"></script>
 <script src="game-5.js?v=ffa284150a"></script>
 <script src="game-6.js?v=ad9df66765"></script>
+<script src="game-7.js?v=dc1ea62577"></script>
 </body>
 </html>
