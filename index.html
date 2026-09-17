@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>英语单词小词典</title>
-  <link rel="stylesheet" href="./styles.css?v=20260826-regression-fix">
+  <link rel="stylesheet" href="./styles.css?v=20260916-safe-delete">
 </head>
 <body>
   <main class="app-shell">
@@ -165,13 +165,13 @@
   </div>
 
   <template id="wordCardTemplate">
-    <article class="word-card"><div class="sequence"></div><div class="word-content"><div class="word-topline"><div><h3 class="word"></h3><p class="syllables"></p></div><div class="card-actions"><button class="speak" aria-label="播放发音">▶</button><button class="delete-card" aria-label="删除这张卡片">×</button></div></div><p class="meaning"></p><div class="word-meta"><span class="source"></span><span class="confidence"></span></div></div></article>
+    <article class="word-card"><div class="sequence"></div><div class="word-content"><div class="word-topline"><div><h3 class="word"></h3><p class="syllables"></p></div><div class="card-actions"><button class="speak" type="button" aria-label="播放发音">▶</button></div></div><p class="meaning"></p><div class="word-meta"><span class="source"></span><span class="confidence"></span></div><div class="card-footer"><button class="delete-card" type="button" aria-label="删除这张卡片，需要确认">删除</button></div></div></article>
   </template>
   <div class="toast" id="toast" role="status"></div>
 
   <script src="./vendor/hypher/hypher.js"></script>
   <script src="./vendor/hypher/en-us.js"></script>
   <script src="./vendor/tesseract/tesseract.min.js"></script>
-  <script src="./app.js?v=20260915-number-prefix"></script>
+  <script src="./app.js?v=20260916-safe-delete"></script>
 </body>
 </html>

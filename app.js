@@ -1335,18 +1335,26 @@
       fragment.querySelector(".source").textContent = card.source;
       fragment.querySelector(".confidence").textContent = card.needsReview ? "待确认" : card.origin === "photo" ? `${card.confidence}%` : "已生成";
       fragment.querySelector(".speak").addEventListener("click", () => speak(card.word));
-      fragment.querySelector(".delete-card").addEventListener("click", () => removeCard(card.id));
+      const deleteButton = fragment.querySelector(".delete-card");
+      deleteButton.setAttribute("aria-label", `删除“${card.word}”这张卡片，需要确认`);
+      deleteButton.addEventListener("click", () => removeCard(card.id));
       container.append(fragment);
       indexInBatch += 1;
     });
   }
 
   function removeCard(id) {
-    state.cards = state.cards.filter((card) => card.id !== id);
+    const card = state.cards.find((item) => item.id === id);
+    if (!card) return;
+    if (!confirm(`确定删除“${card.word}”这张单词卡片吗？\n只删除这一张，同名的其他卡片不受影响。\n误触请点“取消”。`)) return;
+    const remaining = state.cards.filter((item) => item.id !== id);
+    // Persist first: a failed write must leave the visible cards intact.
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(remaining)); }
+    catch { toast("删除未保存，原卡片已保留，请稍后重试"); return; }
+    state.cards = remaining;
     state.latest = state.latest.filter((card) => card.id !== id);
-    saveCards();
     renderAll();
-    toast("这张卡片已删除");
+    toast(`已删除“${card.word}”这张卡片`);
   }
 
   function speak(word) {

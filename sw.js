@@ -1,6 +1,6 @@
-const CACHE = "my-dict-v2-20260915-number-prefix";
+const CACHE = "my-dict-v2-20260916-safe-delete";
 const APP_SHELL = [
-  "./", "./index.html", "./styles.css", "./app.js", "./app.js?v=20260915-number-prefix", "./manifest.webmanifest",
+  "./", "./index.html", "./styles.css", "./styles.css?v=20260916-safe-delete", "./app.js", "./app.js?v=20260916-safe-delete", "./manifest.webmanifest",
   "./vendor/hypher/hypher.js", "./vendor/hypher/en-us.js",
   "./vendor/tesseract/tesseract.min.js", "./vendor/tesseract/worker.min.js",
   "./vendor/tesseract/lang/eng_best.traineddata.gz",
