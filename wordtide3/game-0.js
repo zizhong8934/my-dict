@@ -2653,6 +2653,18 @@ let enemies = [], eid = 0, queue = [], planned = 0;
 let lives = 5, combo = 0, bestCombo = 0, kills = 0, misses = 0, keyOk = 0, keyBad = 0;
 let keyStreak = 0, bestStreak = 0, milestone = 0;
 let activeBoost = null, boostSpeed = 1, killsByTier = {}, relearned = new Set();
+/* 本局养分的加权份数。每击碎一个词记一份，栽过的词记得多一点 ——
+   见 destroy()。不加权的话，滚瓜烂熟的词和刚救回来的硬骨头一样值钱。
+   allKillsShown / clearBonusShown 是给结算面板显示用的：它们在
+   settleFarm 里算出来，面板在另一个函数里，得存下来。 */
+let nutUnits = 0, allKillsShown = 0, clearBonusShown = 1;
+let startedWithDue = false;
+function hasDueWork(){
+  const t=Date.now();
+  return Object.values(S.prog||{}).some(p=>p&&(p.lv>0||p.ok>0||p.bad>0)&&Number(p.due)<=t)
+    ||Object.values(S.wordState||{}).some(p=>p&&p.status!=='new'&&Number(p.dueAt)<=t);
+}
+function rewardDay(){const d=new Date();return [d.getFullYear(),d.getMonth()+1,d.getDate()].join('-')}
 // 本局喂过农场的词（用于收获溯源）：击碎时记一条，含当时的累计失败次数
 let sessFed = [];
 let coinBreak = {kill:0, combo:0, learn:0, master:0, perfect:0}, nutGain = [];
@@ -2718,6 +2730,8 @@ function startGame(){
   // 装备的增益在开局消耗，用掉才扣
   activeBoost = null; boostSpeed = 1;
   killsByTier = {}; nutGain = []; relearned = new Set();
+  nutUnits = 0;
+  startedWithDue=hasDueWork();
   sessFed = [];
   coinBreak = {kill:0, combo:0, learn:0, master:0, perfect:0};
   const eq = S.farm.equipped;
@@ -2792,11 +2806,24 @@ function settleFarm(){
   const total = Math.round(coinBreak.kill + coinBreak.combo + coinBreak.learn
                          + coinBreak.master + coinBreak.perfect);
   S.farm.coin += total;
-  // 养分：本档 1 份，其他档 0.3 份；正确率 ≥90% 全场 ×1.2；深潮增益 ×2
-  const accBonus = accuracy() >= 0.9 ? 1.2 : 1;
+  // 养分：本档六成保底 + 四成看匹配；清空到期词 ×1.15；深潮增益 ×2
+  /* 原来这里是「正确率 ≥90% → ×1.2」。删了 —— 它和整个系统的方向是反的：
+     间隔重复最有效的复习点是"差点想不起来"，最优成功率约在 85–90%，
+     高于这个说明练的东西太简单。奖励高正确率等于在说"别碰难的"，
+     而系统本身又在推你练难词。两套信号打架，玩家会跟着钱走。 */
+  /* dueCount() 定义在记忆模块里，这个作用域够不着 —— 第一版写成
+     typeof dueCount === "function" 就永远是假，那条加成是死代码。
+     S 是全局的，直接照它的口径数一遍。 */
+  let clearBonus = 1;
+  if(startedWithDue&&!hasDueWork()&&S.farm.dueBonusDay!==rewardDay()){
+    clearBonus=1.15;
+    if(kills>0&&S.farm.plots.some(p=>p&&CROPS[p.crop]&&p.nut<CROPS[p.crop].need))S.farm.dueBonusDay=rewardDay();
+  }
+  clearBonusShown = clearBonus;
   const deepBonus = activeBoost === "deep" ? 2 : 1;
   let allKills = 0;
   for(const k in killsByTier) allKills += killsByTier[k];
+  allKillsShown = allKills;
   nutGain = [];
   const wx = curWeather();
   /* 养分是**一个池子**，按各地块的吸收力分配 —— 不是每块地都独立拿满。
@@ -2819,8 +2846,11 @@ function settleFarm(){
        改成"六成保底 + 四成看匹配"：档位仍然重要（匹配满档快 67%），
        但不会让高阶作物完全饿死。选新词的配比还是走 plantMix，不受影响。 */
     const share = allKills ? matched / allKills : 0;
-    const gain = allKills * (0.6 + 0.4 * share)
-               * accBonus * deepBonus * wx.nut * nb * spread;
+    /* allKills 只是"打了几个"，nutUnits 是"救回来多少" —— 用后者。
+       没有加权数据时（老存档、异常路径）退回 allKills，不至于给 0。 */
+    const units = nutUnits > 0 ? nutUnits : allKills;
+    const gain = units * (0.6 + 0.4 * share)
+               * clearBonus * deepBonus * wx.nut * nb * spread;
     const before = p.nut;
     p.nut = Math.min(c.need, Math.round((p.nut + gain) * 10) / 10);
     // 溯源：这株是多少词喂出来的、哪个词栽得最多。
@@ -2974,7 +3004,9 @@ function renderHarvestPanel(){
     nb.innerHTML = '<p class="muted">农场还没种东西 —— 去种一株，下一局的击碎就会变成养分。</p>';
   }else{
     const lines2 = [];
-    if(accuracy() >= 0.9) lines2.push("正确率 " + Math.round(accuracy() * 100) + "% → 养分 ×1.2");
+    if(clearBonusShown > 1) lines2.push("今天的到期词清空了 → 养分 ×1.15");
+    if(nutUnits > allKillsShown)
+      lines2.push("救回了栽过的词 → 份数 " + allKillsShown + " → " + (Math.round(nutUnits * 10) / 10));
     const wx2 = curWeather();
     if(wx2.nut !== 1) lines2.push("今日" + wx2.n + " → 养分 ×" + wx2.nut.toFixed(2));
     const np = S.farm.plots.filter(p => p && CROPS[p.crop]).length;
@@ -3007,7 +3039,11 @@ function destroy(e){
   e.dead = true; kills++; combo++; bestCombo = Math.max(bestCombo, combo);
   const tk = e.item.kind === "s" ? "s" : e.item.t;
   killsByTier[tk] = (killsByTier[tk] || 0) + 1;
-  sessFed.push({w: e.item.w, bad: progOf(e.item).bad | 0});
+  const bad0 = progOf(e.item).bad | 0;
+  /* 只往上加，不往下扣：新手的词都还没栽过，权重全是 1.0，收入和以前一样。
+     把一个栽过两次的硬骨头救回来多给三成 —— 那是这一局里最值钱的一次复习。 */
+  nutUnits += 1 + 0.3 * Math.min(1, bad0 / 2);
+  sessFed.push({w: e.item.w, bad: bad0});
   coinBreak.kill += (TIER_COIN[tk] || 1) * (activeBoost === "echo" ? 1.5 : 1);
   if(e.hinted){
     // 用了浮标提示：给币、给养分，但明码标价 —— 这个词本局不计升级
