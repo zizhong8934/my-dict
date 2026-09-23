@@ -130,6 +130,12 @@
     screen.querySelectorAll("[data-word]").forEach(b=>b.onclick=()=>start("guided",s.items.find(x=>x.id===b.dataset.word)));
   }
 
+  function fitThemeHeader(){
+    const bar=document.getElementById('topbar');
+    if(bar)screen.style.setProperty('--wt-header-height',bar.getBoundingClientRect().bottom+'px');
+  }
+  if(typeof ResizeObserver!=='undefined')new ResizeObserver(fitThemeHeader).observe(document.getElementById('topbar'));
+  window.addEventListener('resize',fitThemeHeader);fitThemeHeader();
   function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
   function start(mode,one){
     const s=sea();let items=one?[one]:s.items.slice();   /* 原来 full 的主题只取 CORE_TOOLS（12 词），那是因为当初只有那 12 个有完整数据；现在 156 个都有了 */
@@ -152,15 +158,26 @@
   function holdOn(){
     const active=run,index=run.i,phase=run.phase;
     active.locked=true;
-    const bar=document.getElementById("thGoOn");
-    if(!bar){advanceAfter(advanceLesson,900);return}
-    bar.innerHTML='<button class="th-main th-goon-btn" id="thGoOnBtn">继续 →</button>';
-    const btn=document.getElementById("thGoOnBtn");
-    if(!btn){advanceAfter(advanceLesson,900);return}
+    const bar=document.getElementById('thGoOn');
+    let btn=document.getElementById('thCompleteCheck')||document.getElementById('thCheck')||document.getElementById('thColoCheck');
+    if(btn){btn.id='thGoOnBtn';btn.textContent='继续 →';btn.classList.add('th-main');}
+    else if(bar){bar.innerHTML='<button class="th-main th-goon-btn" id="thGoOnBtn">继续 →</button>';btn=document.getElementById('thGoOnBtn');}
+    if(!btn)return;
+    screen.querySelectorAll('input').forEach(x=>{x.readOnly=true;x.blur()});
+    const hint=document.getElementById('thCompleteHint');if(hint)hint.disabled=true;
     btn.onclick=()=>{
-      if(run!==active||run.i!==index||run.phase!==phase)return;   /* 连点两下只走一次 */
+      if(run!==active||run.i!==index||run.phase!==phase||!active.locked)return;
       active.locked=false;advanceLesson();
     };
+    requestAnimationFrame(()=>{if(run===active&&active.locked&&btn.isConnected)btn.scrollIntoView({block:'nearest'});});
+  }
+  function answerKey(e,check){
+    if(e.key!=='Enter'||e.isComposing||e.repeat)return;
+    e.preventDefault();
+    if(run?.locked)document.getElementById('thGoOnBtn')?.click();else check();
+  }
+  function focusAnswer(input){
+    if(!coarse())setTimeout(()=>{if(input.isConnected)input.focus()},50);
   }
   function advanceAfter(callback,ms){
     const active=run,index=run.i;active.locked=true;
@@ -436,21 +453,38 @@
     run.mask={key:k,chars,hidden,typed:"",hints:0};
   }
   function renderMask(){
-    const m=run.mask,box=document.getElementById("thMask");if(!m||!box)return;
-    box.innerHTML=m.chars.map((c,i)=>{if(c===" ")return '<span class="th-mask-char space"></span>';const n=m.hidden.indexOf(i),v=n>=0?(m.typed[n]||"_"):c;return '<span class="th-mask-char '+(n>=0&&!m.typed[n]?'blank':'')+'">'+esc(v)+'</span>'}).join("");
-    const note=document.getElementById("thMaskNote");if(note)note.textContent="需要补全 "+m.hidden.length+" 个字母 · 已输入 "+Math.min(m.typed.length,m.hidden.length)+" 个 · 提示 "+m.hints+"/3";
+    const m=run.mask,box=document.getElementById('thMask');if(!m||!box)return;
+    box.innerHTML=m.chars.map((c,i)=>{
+      if(c===' ')return '<span class="th-mask-char space"></span>';
+      const blank=m.hidden.includes(i)&&!(m.revealed||[]).includes(i)&&!run.locked;
+      return '<span class="th-mask-char '+(blank?'blank':'')+'">'+esc(blank?'_':c)+'</span>';
+    }).join('');
+    const note=document.getElementById('thMaskNote');
+    if(note)note.textContent='请输入完整英文（不是只填空缺） · 提示 '+m.hints+'/3';
   }
-  function expectedMissing(m){return m.hidden.map(i=>m.chars[i]).join("")}
+  function expectedMissing(m){return m.chars.join('')}
   function checkComplete(){
     if(!run||run.locked)return;
-    const it=current(),m=run.mask,fb=document.getElementById("thFeedback"),input=document.getElementById("thCompleteInput");if(!it||!m||!fb||!input)return;
-    const ok=m.typed===expectedMissing(m);
-    if(ok){mark(it,"complete",true,{hintCount:m.hints});run.ok++;soundCue("ok");fb.className="th-feedback ok";fb.textContent="✓ 补全正确："+it.w;screen.querySelector(".th-answer").classList.add("show");speakAt(it.w,.74);holdOn()}
-    else{mark(it,"complete",false);run.bad++;soundCue("bad");requeue(it);fb.className="th-feedback bad";fb.textContent="还不正确。完整单词是："+it.w;screen.querySelector(".th-answer").classList.add("show");m.typed="";input.value="";renderMask();input.focus()}
+    const it=current(),m=run.mask,fb=document.getElementById('thFeedback'),input=document.getElementById('thCompleteInput');
+    if(!it||!m||!fb||!input)return;
+    m.typed=input.value;
+    if(!norm(m.typed)){fb.className='th-feedback';fb.textContent='先输入完整单词，再检查。';input.focus();return;}
+    if(norm(m.typed)===norm(it.w)){
+      mark(it,'complete',true,{hintCount:m.hints});run.ok++;soundCue('ok');fb.className='th-feedback ok';fb.textContent='✓ 拼写正确：'+it.w;
+      screen.querySelector('.th-answer').classList.add('show');speakAt(it.w,.74);holdOn();renderMask();
+    }else{
+      mark(it,'complete',false);run.bad++;soundCue('bad');requeue(it);fb.className='th-feedback bad';
+      fb.textContent='再试一次，请输入完整英文：'+it.w;
+      screen.querySelector('.th-answer').classList.add('show');input.focus();input.select();
+    }
   }
   function giveCompleteHint(){
-    const m=run.mask,input=document.getElementById("thCompleteInput");if(!m||!input)return;if(m.hints>=3){toast("这个词已经提示三次");return}
-    const expected=expectedMissing(m);if(m.typed.length>=expected.length)return;m.typed+=expected[m.typed.length];m.hints++;input.value=m.typed;S.themeStats.hints=(S.themeStats.hints|0)+1;save();renderMask();input.focus();
+    if(!run||run.locked)return;
+    const m=run.mask;if(!m||m.hints>=3)return;
+    m.revealed=m.revealed||[];const next=m.hidden.find(i=>!m.revealed.includes(i));
+    if(next===undefined)return;
+    m.revealed.push(next);m.hints++;S.themeStats.hints=(S.themeStats.hints|0)+1;save();renderMask();
+    const hint=document.getElementById('thCompleteHint');if(hint)hint.disabled=m.hints>=3||m.revealed.length===m.hidden.length;
   }
   function lessonMode(){
     const mode=rawLessonMode();
@@ -516,7 +550,7 @@
     }
     if(isRecall)right+='<div id="thRecallAsk"><h3>先在心里说出英文</h3><p>想好以后再翻开答案。</p><div class="th-actions"><button id="thReveal">翻开答案</button></div></div><div class="th-actions" id="thRecallGrade" style="display:none"><button id="thForgot">没想起</button><button id="thRemember" class="th-main">想起来了</button><button id="thHear">🔊 听发音</button></div>';
     if(isAssemble)right+='<h2 class="th-build-title">'+esc(isSent?((it.ex&&it.ex[0]&&it.ex[0][1])||it.zh):it.zh)+'</h2>'+'<p class="th-build-sub">'+(isSent?'把意群按正确顺序拼成完整的句子。'+'意群是说话时成块出的单位，不是一个词一个词蹦。':assemblyInstruction())+'</p><div class="th-built empty" id="thBuilt"></div><div class="th-tiles" id="thTiles"></div><div class="th-feedback" id="thFeedback"></div><div class="th-actions"><button id="thHear">🔊 听发音</button><button id="thBuildReset">重新排列</button></div><p class="th-tip">点下面的块往上放，点上面的块退回来。拼满自动判。</p>';
-    if(isComplete)right+='<h2 class="th-build-title">'+esc(it.zh)+'</h2><p class="th-build-sub">只输入下划线缺少的字母，按从左到右的顺序补全。</p><div class="th-mask" id="thMask"></div><div class="th-mask-note" id="thMaskNote"></div><input class="th-spell-input" id="thCompleteInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="只输入缺少的字母"><div class="th-feedback" id="thFeedback"></div><div class="th-actions"><button id="thHear">🔊 听发音</button><button id="thCompleteHint">提示一个字母</button><button class="th-main" id="thCompleteCheck">检查补全</button></div>';
+    if(isComplete)right+='<h2 class="th-build-title">'+esc(it.zh)+'</h2><p class="th-build-sub">参考字母提示，输入完整英文单词或短语。</p><div class="th-mask" id="thMask"></div><div class="th-mask-note" id="thMaskNote"></div><input class="th-spell-input" id="thCompleteInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入完整英文"><div class="th-feedback" id="thFeedback"></div><div class="th-actions"><button id="thHear">🔊 听发音</button><button id="thCompleteHint">提示一个字母</button><button class="th-main" id="thCompleteCheck">检查拼写</button></div>';
     if(isSpell)right+='<h2 class="th-build-title">'+esc(it.zh)+'</h2>'
       /* 照片是歧义的：一张锤子的图可以是 hammer / tool / nail / hit。
          中文释义才是唯一确定的题面，照片只当辅助。 */
@@ -546,14 +580,15 @@
     }
     const firstLook=(isLearn||isZh)&&needsFirstLook(it);
     if(firstLook)right=firstLookInline(it)+right.replace('四张图里，哪一张是这个意思？','先听读英文，再选出对应的图片。');
-    const title=firstLook?"认识并练习":isListen?"听音选义":isZh?"中文选词":isPick?"看图选义":isRecall?"图片回忆":isSent?"句子拼写":isColo?"词语搭配":isAssemble?"词块组装":isComplete?"补全空缺":"最终默写",label=isListen?'听音':isZh?'选词':isLearn?'认识':isSent?'拼句':isColo?'搭配':isAssemble?'组装':isComplete?'补全':'默写';
+    const title=firstLook?"认识并练习":isListen?"听音选义":isZh?"中文选词":isPick?"看图选义":isRecall?"图片回忆":isSent?"句子拼写":isColo?"词语搭配":isAssemble?"词块组装":isComplete?"提示拼写":"最终默写",label=isListen?'听音':isZh?'选词':isLearn?'认识':isSent?'拼句':isColo?'搭配':isAssemble?'组装':isComplete?'补全':'默写';
     /* 看图选义 / 中文选词没有照片（那张大图就是答案）。不加 th-solo 的话，
        内容会掉进两列网格的第一列里，右边空一半 —— 就是排版难看的根源。 */
     const solo=isPick||isZh;
     shell(title,'<div class="th-lesson-card'+(solo?' th-solo':'')+'">'
       +(solo?'':visual(it,label))
-      +'<div class="th-quiz">'+right+info(it,true)
-      +'<div class="th-goon" id="thGoOn"></div></div></div>');
+      +'<div class="th-quiz">'+right+'<div class="th-goon" id="thGoOn"></div>'+info(it,true)+'</div></div>');
+    screen.scrollTop=0;
+    const feedback=document.getElementById('thFeedback');if(feedback){feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');}
     wireFirstLook(it);
     const hear=document.getElementById('thHear');if(hear)hear.onclick=()=>{const sentence=it.ex?.[0]?.[0]||it.w;if(window.WT_AUDIO)WT_AUDIO.sequence([it.w,sentence],.78);else speakAt(it.w,.72)};
     if(isPick||isZh){
@@ -568,24 +603,31 @@
     }
     if(isRecall){document.getElementById("thReveal").onclick=()=>{screen.querySelector(".th-answer").classList.add("show");document.getElementById("thRecallAsk").style.display="none";document.getElementById("thRecallGrade").style.display="flex"};document.getElementById("thForgot").onclick=()=>gradeRecall(false);document.getElementById("thRemember").onclick=()=>gradeRecall(true)}
     if(isAssemble){renderBuildBoard();document.getElementById("thBuildReset").onclick=()=>{if(run.locked)return;run.build.selected=[];run.build.order=shuffle(run.build.order);renderBuildBoard()};}
-    if(isComplete){renderMask();const input=document.getElementById("thCompleteInput");input.oninput=()=>{input.value=input.value.toLowerCase().replace(/[^a-z]/g,"").slice(0,run.mask.hidden.length);run.mask.typed=input.value;renderMask()};input.onkeydown=e=>{if(e.key==="Enter")checkComplete()};document.getElementById("thCompleteHint").onclick=giveCompleteHint;document.getElementById("thCompleteCheck").onclick=checkComplete;setTimeout(()=>input.focus(),50)}
+    if(isComplete){
+      renderMask();const input=document.getElementById('thCompleteInput');
+      input.oninput=()=>{if(!run.locked)run.mask.typed=input.value};
+      input.onkeydown=e=>answerKey(e,checkComplete);
+      document.getElementById('thCompleteHint').onclick=giveCompleteHint;
+      document.getElementById('thCompleteCheck').onclick=checkComplete;focusAnswer(input);
+    }
     if(isColo){
       const c=run.colo;
       if(c.empty){document.getElementById("thColoSkip").onclick=()=>{run.ok++;advanceLesson()}}
       else{
         const inp=document.getElementById("thColoInput");
         document.getElementById("thColoCheck").onclick=()=>checkColo(inp.value);
-        inp.onkeydown=e=>{if(e.key==="Enter")checkColo(inp.value)};
-        setTimeout(()=>inp.focus(),50);
+        inp.onkeydown=e=>answerKey(e,()=>checkColo(inp.value));
+        focusAnswer(inp);
       }
     }
-    if(isSpell){const input=document.getElementById("thInput"),check=document.getElementById("thCheck");check.onclick=()=>checkSpell(input.value);input.onkeydown=e=>{if(e.key==="Enter")checkSpell(input.value)};setTimeout(()=>input.focus(),50)}
+    if(isSpell){const input=document.getElementById("thInput"),check=document.getElementById("thCheck");check.onclick=()=>checkSpell(input.value);input.onkeydown=e=>answerKey(e,()=>checkSpell(input.value));focusAnswer(input)}
   }
   function gradeRecall(ok){const it=current();mark(it,"recall",ok);soundCue(ok?"ok":"bad");if(ok)run.ok++;else{run.bad++;requeue(it)}advanceLesson()}
   function norm(x){return String(x||"").toLowerCase().trim().replace(/[‐‑–—-]/g," ").replace(/\s+/g," ")}
   function requeue(it){const k=key(it);if((run.requeued[k]|0)<1){run.requeued[k]=1;run.queue.push(it);if(run.daily&&S.dailySession?.queue){S.dailySession.queue.push({themeId:itemSeaId(it),id:it.id,wordId:key(it),exercise:it._exercise||'spell',reason:'错词回练'});save()}}}
   function checkSpell(value){
     if(!run||run.locked||!current())return;
+    if(!norm(value)){const fb=document.getElementById("thFeedback");if(fb){fb.className="th-feedback";fb.textContent="先输入英文答案。"}return;}
     const it=current(),ok=norm(value)===norm(it.w),fb=document.getElementById("thFeedback"),input=document.getElementById("thInput");if(!it||!fb)return;
     if(ok){mark(it,"spell",true);run.ok++;soundCue("ok");fb.className="th-feedback ok";fb.textContent="✓ 正确："+it.w;speakAt(it.w,.78);holdOn()}
     else{mark(it,"spell",false);run.bad++;soundCue("bad");requeue(it);fb.className="th-feedback bad";fb.textContent="正确答案："+it.w+"（再输入一次）";screen.querySelector(".th-answer").classList.add("show");speakAt(it.w,.68);input.value="";input.placeholder=it.w;input.focus()}
