@@ -168,7 +168,7 @@
     S.dailySession={id:"daily-"+now(),plan:built.plan,queue:built.queue,index:0,startedAt:now(),updatedAt:now(),completed:false,estimateMinutes:built.estimateMinutes};persist();
     return window.WORDTIDE_THEME&&window.WORDTIDE_THEME.startDaily(built.queue,{plan:built.plan,offset:0});
   }
-  function resumeSession(){if(!sessionUsable())return false;const s=S.dailySession,remaining=s.queue.slice(s.index);return window.WORDTIDE_THEME&&window.WORDTIDE_THEME.startDaily(remaining,{plan:s.plan,offset:s.index})}
+  function resumeSession(){if(!sessionUsable())return false;const s=S.dailySession,remaining=s.queue.slice(s.index);return window.WORDTIDE_THEME&&window.WORDTIDE_THEME.startDaily(remaining,{plan:s.plan,offset:s.index,resume:true})}
   function updateSession(index){if(!S.dailySession||S.dailySession.completed)return;S.dailySession.index=Math.max(S.dailySession.index|0,index|0);S.dailySession.updatedAt=now();persist()}
   function completeSession(result){
     if(!S.dailySession)return;S.dailySession.index=S.dailySession.queue&&S.dailySession.queue.length||0;S.dailySession.completed=true;S.dailySession.completedAt=now();S.dailySession.result=result||{};

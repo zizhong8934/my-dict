@@ -151,16 +151,17 @@
     opts=opts||{};const queue=(refs||[]).map(ref=>{const s=SEAS.find(x=>x.id===ref.themeId),it=s&&s.items.find(x=>x.id===ref.id);return it?Object.assign({},it,{_seaId:ref.themeId,_exercise:ref.exercise||"spell",_reason:ref.reason||"今日计划"}):null}).filter(Boolean);
     if(!queue.length){toast("今天暂时没有可学习的词");return false}
     run={mode:"daily",phase:null,items:queue.slice(),queue:queue.slice(),i:0,ok:0,bad:0,t0:Date.now(),missed:[],lvUps:0,hp:100,def:3,requeued:{},rate:S.themeEchoRate||.78,build:null,mask:null,daily:true,dailyPlan:opts.plan||"quick",dailyOffset:opts.offset|0};
-    run.dailyResults=opts.offset>0&&Array.isArray(S.dailySession?.presentationAnswers)?S.dailySession.presentationAnswers.slice():[];
-    if(opts.offset>0){run.ok=S.dailySession?.presentationTotals?.ok||0;run.bad=S.dailySession?.presentationTotals?.bad||0;}
-    showScreen("scTheme");renderLesson();return true;
+    const resuming=opts.resume||opts.offset>0;
+    run.dailyResults=resuming&&Array.isArray(S.dailySession?.presentationAnswers)?S.dailySession.presentationAnswers.slice():[];
+    if(resuming){run.ok=S.dailySession?.presentationTotals?.ok||0;run.bad=S.dailySession?.presentationTotals?.bad||0;for(const q of S.dailySession?.queue||[])if(q.reason==="错词回练")run.requeued[q.themeId+":"+q.id]=1;}
+    showScreen("scTheme");renderLesson();if(resuming)restoreDailyCheckpoint();return true;
   }
   function current(){return run&&run.queue[run.i]}
   /* 答完之后停住，等人点「继续」。
      找不到容器时退回定时器 —— 宁可跳快了，也不能卡死在一道题上。 */
   function holdOn(){
     const active=run,index=run.i,phase=run.phase;
-    active.locked=true;
+    active.locked=true;if(run.daily)saveDailyCheckpoint();
     const bar=document.getElementById('thGoOn');
     let btn=document.getElementById('thDailyConfirm')||document.getElementById('thCompleteCheck')||document.getElementById('thCheck')||document.getElementById('thColoCheck');
     if(btn){btn.id='thGoOnBtn';btn.textContent='继续 →';btn.classList.add('th-main');}
@@ -607,7 +608,7 @@
       }
     }
     if(run.daily&&(isPick||isZh)){const c=document.getElementById('thDailyConfirm');if(c)c.onclick=()=>{if(run.pick.selected==null){document.getElementById('thFeedback').textContent='先选一个答案，再确认。';return;}checkPick(run.pick.selected)};}
-    if(isRecall){document.getElementById("thReveal").onclick=()=>{screen.querySelector(".th-answer").classList.add("show");document.getElementById("thRecallAsk").style.display="none";document.getElementById("thRecallGrade").style.display="flex"};document.getElementById("thForgot").onclick=()=>gradeRecall(false);document.getElementById("thRemember").onclick=()=>gradeRecall(true)}
+    if(isRecall){document.getElementById("thReveal").onclick=()=>{screen.querySelector(".th-answer").classList.add("show");document.getElementById("thRecallAsk").style.display="none";document.getElementById("thRecallGrade").style.display="flex";const details=screen.querySelector(".dy-explanation");if(details)details.open=true};document.getElementById("thForgot").onclick=()=>gradeRecall(false);document.getElementById("thRemember").onclick=()=>gradeRecall(true)}
     if(isAssemble){renderBuildBoard();document.getElementById("thBuildReset").onclick=()=>{if(run.locked)return;run.build.selected=[];run.build.order=shuffle(run.build.order);renderBuildBoard()};}
     if(isComplete){
       renderMask();const input=document.getElementById('thCompleteInput');
@@ -630,7 +631,7 @@
   }
   function gradeRecall(ok){const it=current();mark(it,"recall",ok);soundCue(ok?"ok":"bad");if(ok)run.ok++;else{run.bad++;requeue(it)}advanceLesson()}
   function norm(x){return String(x||"").toLowerCase().trim().replace(/[‐‑–—-]/g," ").replace(/\s+/g," ")}
-  function requeue(it){const k=key(it);if((run.requeued[k]|0)<1){run.requeued[k]=1;run.queue.push(it);if(run.daily&&S.dailySession?.queue){S.dailySession.queue.push({themeId:itemSeaId(it),id:it.id,wordId:key(it),exercise:it._exercise||'spell',reason:'错词回练'});save()}}}
+  function requeue(it){const k=key(it);if((run.requeued[k]|0)<1){run.requeued[k]=1;run.queue.push(run.daily?{...it,_reason:"错词回练"}:it);if(run.daily&&S.dailySession?.queue){S.dailySession.queue.push({themeId:itemSeaId(it),id:it.id,wordId:key(it),exercise:it._exercise||'spell',reason:'错词回练'});save()}}}
   function checkSpell(value){
     if(!run||run.locked||!current())return;
     if(!norm(value)){const fb=document.getElementById("thFeedback");if(fb){fb.className="th-feedback";fb.textContent="先输入英文答案。"}return;}
@@ -740,7 +741,7 @@
     if(answer){
       const details=document.createElement('details');details.className='dy-explanation';
       const label=document.createElement('summary');label.textContent='查看单词与例句';
-      details.appendChild(label);details.appendChild(answer);controls.after(details);
+      details.appendChild(label);details.appendChild(answer);if(mode==='recall')controls.before(details);else controls.after(details);
     }
   }
   function recordDailyPresentation(it,ok,p){
@@ -754,10 +755,44 @@
       S.dailySession.presentationTotals={ok:run.ok+(ok?1:0),bad:run.bad+(ok?0:1)};
     }
   }
+  function saveDailyCheckpoint(){
+    const s=S.dailySession,it=current();if(!s||s.completed||!it)return;
+    const fb=document.getElementById('thFeedback');
+    s.presentationCheckpoint={
+      position:(run.dailyOffset|0)+run.i,id:it.id,themeId:itemSeaId(it),
+      feedback:fb?.textContent||'',feedbackClass:fb?.classList.contains('bad')?'bad':'ok',
+      picked:run.pick?.selected,
+      inputs:[...screen.querySelectorAll('input')].map(x=>({id:x.id,value:x.value})),
+      answerShown:!!screen.querySelector('.th-answer.show')
+    };
+    save();
+  }
+  function restoreDailyCheckpoint(){
+    const c=S.dailySession?.presentationCheckpoint,it=current();
+    if(!c||!it||c.position!==(run.dailyOffset|0)+run.i||c.id!==it.id||c.themeId!==itemSeaId(it))return;
+    const fb=document.getElementById('thFeedback');
+    if(fb){fb.textContent=c.feedback;fb.className='th-feedback '+(c.feedbackClass==='bad'?'bad':'ok');}
+    for(const v of c.inputs||[]){const input=document.getElementById(v.id);if(input?.tagName==='INPUT')input.value=v.value;}
+    if(c.answerShown)screen.querySelector('.th-answer')?.classList.add('show');
+    if(run.pick){
+      const p=run.pick;p.done=true;p.selected=c.picked;
+      screen.querySelectorAll('[data-pick]').forEach(b=>{
+        const n=Number(b.dataset.pick),o=p.opts[n];
+        b.classList.add('locked');
+        if(n===p.answer||n===c.picked){
+          const ok=n===p.answer;b.classList.add(ok?'right':'wrong');
+          const tag=document.createElement('span');tag.className='th-pick-tag '+(ok?'ok':'bad');tag.textContent=o.w+' · '+o.zh;b.appendChild(tag);
+        }else b.classList.add('dim');
+      });
+    }
+    if(run.build){run.build.selected=run.build.correct.slice();renderBuildBoard();}
+    holdOn();if(run.mask)renderMask();
+  }
   function dailySummary(){
     dailyTone();screen.dataset.exercise='summary';
     const results=run.dailyResults||[],done=results.length,right=results.filter(x=>x.firstCorrect).length,wrong=done-right;
-    const newCount=new Set(results.filter(x=>x.wasNew&&x.correct).map(x=>x.themeId+':'+x.id)).size;
+    const newIds=new Set(results.filter(x=>x.wasNew).map(x=>x.themeId+':'+x.id));
+    const newCount=new Set(results.filter(x=>x.correct&&newIds.has(x.themeId+':'+x.id)).map(x=>x.themeId+':'+x.id)).size;
     const elapsed=Date.now()-(S.dailySession?.startedAt||run.t0||Date.now());
     const missed=results.filter(x=>!x.firstCorrect).map(x=>{const it=SEAS.find(s=>s.id===x.themeId)?.items.find(it=>it.id===x.id);return it?{...it,_seaId:x.themeId}:null}).filter(Boolean).filter((it,i,a)=>a.findIndex(x=>key(x)===key(it))===i);
     if(window.WORDTIDE_MEMORY&&!run.summarySaved){window.WORDTIDE_MEMORY.completeSession({ok:run.ok,bad:run.bad,firstCorrect:right,completedQuestions:done,newRecognized:newCount});run.summarySaved=true;}
