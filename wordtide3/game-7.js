@@ -19,7 +19,7 @@
   for(const name of ['tide-light','tide-dark','explore-light','explore-dark','boss-light','boss-dark'])root.style.setProperty('--'+name,'url("'+art[name]+'")');
   for(const name of ['tide-light','tide-dark'])document.documentElement.style.setProperty('--dy-'+name,'url("'+art[name]+'")');
   let view='home';
-  function appearance(){const dark=S.themeAppearance==='dark';root.dataset.appearance=dark?'dark':'light';home.dataset.appearance=root.dataset.appearance;const b=document.getElementById('oxAppearance');b.innerHTML=icon(dark?'sun':'moon');b.setAttribute('aria-label',dark?'切换浅色模式':'切换深色模式');b.setAttribute('aria-pressed',String(dark));}
+  function appearance(){const dark=S.themeAppearance==='dark';window.WT_BOOT?.tone(dark?'dark':'light');root.dataset.appearance=dark?'dark':'light';home.dataset.appearance=root.dataset.appearance;const b=document.getElementById('oxAppearance');b.innerHTML=icon(dark?'sun':'moon');b.setAttribute('aria-label',dark?'切换浅色模式':'切换深色模式');b.setAttribute('aria-pressed',String(dark));}
   if(!['light','dark'].includes(S.themeAppearance))S.themeAppearance=window.matchMedia?.('(prefers-color-scheme: dark)').matches?'dark':'light';
   function toggle(){S.themeAppearance=S.themeAppearance==='dark'?'light':'dark';appearance();save()}
   function currentSession(){const x=S.dailySession;return x&&Array.isArray(x.queue)&&!x.completed&&x.index<x.queue.length?x:null}
@@ -44,6 +44,6 @@
   const oldShow=window.showScreen;window.showScreen=function(id){const r=oldShow.apply(this,arguments);document.body.classList.toggle('ox-home-visible',id==='scHome');if(id==='scHome'){showView('home');appearance()}return r};
   window.addEventListener('wordtide-memory-updated',()=>{if(document.querySelector('#scHome.on'))update()});
   window.OCEAN_HOME={update,showView,action,toggle,view:()=>view};
-  document.body.classList.toggle('ox-home-visible',home.classList.contains('on'));appearance();showView('home');
+  document.body.classList.toggle('ox-home-visible',home.classList.contains('on'));appearance();showView('home');window.WT_BOOT?.finish();
 })();
 

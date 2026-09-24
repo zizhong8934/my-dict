@@ -181,18 +181,32 @@
     return {total:states.length,due,stable,learning,fresh,weak,unhintedRate:delayed.length?Math.round(unhinted/delayed.length*100):0};
   }
   function labelPlan(p){return p==="standard"?"标准计划":p==="review"?"只复习":"快速计划"}
-  function renderDaily(){
-    const s=stats(),quick=buildDailyQueue("quick"),standard=buildDailyQueue("standard"),battle=buildBattleQueue(),resume=sessionUsable()?S.dailySession:null;
-    screen.innerHTML='<div class="p3-shell"><div class="p3-head"><button class="sm" id="p3Back">← 首页</button><div><div class="p3-kicker">PHASE 3 · DAILY TIDE</div><h1>今日潮汐</h1><p>系统已经按到期时间、错误次数和学习阶段排好顺序。</p></div><div class="p3-due"><b>'+s.due+'</b><span>今日到期</span></div></div>'+
-      (resume?'<section class="p3-resume"><div><b>上次还有 '+(resume.queue.length-resume.index)+' 题没有完成</b><span>'+labelPlan(resume.plan)+' · 已自动保存到第 '+resume.index+' 题</span></div><button class="pri" id="p3Resume">继续上次学习</button></section>':'')+
-      '<div class="p3-stats"><div><b>'+s.due+'</b><span>到期复习</span></div><div><b>'+s.weak+'</b><span>薄弱词</span></div><div><b>'+s.learning+'</b><span>正在巩固</span></div><div><b>'+s.stable+'</b><span>稳定记忆</span></div></div>'+
-      '<section class="p3-plan-grid"><article><div class="p3-plan-icon">⚡</div><h2>6分钟快速学习</h2><p>最多 12 题，适合上课或短暂空闲。系统自动选择今天最需要的一种练法。</p><div class="p3-plan-meta"><span>'+quick.queue.length+' 题</span><span>约 '+quick.estimateMinutes+' 分钟</span><span>新词最多 '+quick.counts.newCap+'</span></div><button class="pri" data-plan="quick">开始快速计划</button></article><article><div class="p3-plan-icon">🌊</div><h2>15分钟标准学习</h2><p>最多 20 题，复习、错词和少量新词混合，适合课后完整练习。</p><div class="p3-plan-meta"><span>'+standard.queue.length+' 题</span><span>约 '+standard.estimateMinutes+' 分钟</span><span>新词最多 '+standard.counts.newCap+'</span></div><button class="pri" data-plan="standard">开始标准计划</button></article><article><div class="p3-plan-icon">🧭</div><h2>只清理复习</h2><p>不增加新词，只处理已经学习过且今天到期的内容。</p><div class="p3-plan-meta"><span>'+s.due+' 个到期</span><span>不加新词</span></div><button data-plan="review">只复习</button></article></section>'+
-      '<section class="p3-battle"><div><div class="p3-kicker">ORIGINAL TOWER DEFENSE</div><h2>今日词组进入原塔防</h2><p>'+(battle.length?'已经选出 '+battle.length+' 个学过或到期词；照片会作为题牌出现，结果写回同一份记忆状态。':'先完成一些主题学习，系统就会把合适的词送入原塔防。')+'</p></div><button class="pri" id="p3Battle" '+(battle.length?'':'disabled')+'>进入今日塔防</button></section>'+
-      '<section class="p3-explain"><h2>为什么今天出现这些词？</h2><div><span><i class="due"></i>到期复习：已经接近遗忘时间</span><span><i class="weak"></i>薄弱词：近期答错或依赖提示</span><span><i class="fresh"></i>今日新词：复习量允许时少量加入</span></div><p>当天完成课程只算“已学习”；跨天独立答对后，才会逐步进入稳定记忆。</p></section></div>';
-    document.getElementById("p3Back").onclick=()=>{showScreen("scHome");try{refreshHome()}catch(e){}};
-    screen.querySelectorAll("[data-plan]").forEach(b=>b.onclick=()=>startPlan(b.dataset.plan));const rb=document.getElementById("p3Resume");if(rb)rb.onclick=resumeSession;const bb=document.getElementById("p3Battle");if(bb&&!bb.disabled)bb.onclick=startBattle;
+  function planIcon(name){
+    const paths={back:'m14 5-7 7 7 7',sound:'M11 4 6 8H3v8h3l5 4V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14',bolt:'m14 2-9 12h6l-1 8 9-12h-6l1-8',wave:'M2 9c4-6 6 6 10 0s6 6 10 0M2 16c4-6 6 6 10 0s6 6 10 0',again:'M20 7v5h-5M20 12a8 8 0 1 0-2 6',moon:'M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z',sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 1v3m0 16v3M1 12h3m16 0h3'};
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+paths[name]+'"/></svg>';
   }
-  function openDaily(){showScreen("scDaily");renderDaily()}
+  function renderDaily(){
+    const s=stats(),quick=buildDailyQueue('quick'),standard=buildDailyQueue('standard'),review=buildDailyQueue('review'),battle=buildBattleQueue(),resume=sessionUsable()?S.dailySession:null;
+    const tone=S.themeAppearance==='dark'?'dark':'light';screen.dataset.tone=tone;
+    const planCard=(plan,title,icon,description)=>'<article class="pl-plan"><div class="pl-plan-top"><span class="pl-icon">'+planIcon(icon)+'</span><div><h2>'+title+'</h2><p>'+description+'</p></div></div><div class="pl-plan-bottom"><span>'+plan.queue.length+' 题 · 约 '+plan.estimateMinutes+' 分钟</span><button '+(plan.queue.length?'':'disabled ')+'data-plan="'+plan.plan+'">'+(plan.queue.length?'开始学习':'暂无内容')+' <span aria-hidden="true">→</span></button></div></article>';
+    screen.innerHTML='<div class="pl-shell"><header class="pl-header"><button id="p3Back" class="pl-round" aria-label="返回首页">'+planIcon('back')+'</button><div class="pl-title"><h1>今日潮汐</h1><p>复习一点，也认识新词</p></div><button id="plAudio" class="pl-round" aria-label="声音设置">'+planIcon('sound')+'</button><button id="plTone" class="pl-round" aria-label="'+(tone==='dark'?'切换浅色模式':'切换深色模式')+'">'+planIcon(tone==='dark'?'sun':'moon')+'</button></header>'
+      +'<section class="pl-hero"><div class="pl-hero-copy"><span class="pl-eyebrow">今天的学习</span><h2><strong>'+s.due+'</strong> 个词到期</h2><p>'+(s.due?'先温习旧词，让记忆更牢固。':'没有到期词，按自己的节奏来。')+'</p></div>'
+      +(resume?'<div class="pl-resume"><div><b>接着上次继续</b><span>'+labelPlan(resume.plan)+' · 停在第 '+(resume.index+1)+' / '+resume.queue.length+' 题</span></div><div class="pl-progress" role="progressbar" aria-label="上次学习进度" aria-valuemin="0" aria-valuemax="'+resume.queue.length+'" aria-valuenow="'+resume.index+'"><i style="width:'+Math.round(resume.index/resume.queue.length*100)+'%"></i></div><button class="pl-primary" id="p3Resume">继续上次学习 <span aria-hidden="true">→</span></button></div>':'<div class="pl-hero-note">新词与复习穿插出现，不用从头重来。</div>')+'</section>'
+      +'<div class="pl-stats" aria-label="学习概况">'+[['薄弱词',s.weak],['正在巩固',s.learning],['稳定记忆',s.stable]].map(([label,n])=>'<div><b>'+n+'</b><span>'+label+'</span></div>').join('')+'</div>'
+      +'<section class="pl-plans"><div class="pl-section-head"><h2>'+(resume?'也可以开始新一轮':'选一轮，开始学习')+'</h2><span>自动安排题型</span></div>'
+      +planCard(quick,'快速学习','bolt','复习与少量新词，短暂空闲也能练。')
+      +planCard(standard,'标准学习','wave','多练一会儿，穿插复习、错词和新词。')
+      +planCard(review,'专注复习','again',s.due?'优先温习到期内容，不加新词。':review.queue.length?'今天没有到期词，可以提前巩固。':'还没有学过的词，先从快速学习开始。')+'</section>'
+      +'<details class="pl-more"><summary>实战与学习说明</summary><section class="pl-battle"><h2>今日塔防</h2><p>'+(battle.length?'用 '+battle.length+' 个学过的词进行实战练习。':'完成一些单词学习后，即可进入今日塔防。')+'</p><button id="p3Battle" '+(battle.length?'':'disabled')+'>进入今日塔防</button></section><section class="pl-explain"><h2>为什么出现这些词？</h2><p>到期复习：按记忆情况安排温习。<br>薄弱词：最近答错过，需要多练一次。<br>新词：复习量允许时，少量穿插加入。</p><p>当天答对是开始，跨天独立回忆才会逐步成为稳定记忆。</p></section></details>'
+      +'<p class="pl-footer">学习记录保存在当前浏览器</p></div>';
+    document.getElementById('p3Back').onclick=()=>{showScreen('scHome');try{refreshHome()}catch(e){}};
+    document.getElementById('plAudio').onclick=()=>document.getElementById('wtAudioButton')?.click();
+    document.getElementById('plTone').onclick=()=>{if(window.OCEAN_HOME)OCEAN_HOME.toggle();else{S.themeAppearance=tone==='dark'?'light':'dark';persist()}renderDaily()};
+    screen.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>startPlan(b.dataset.plan));
+    const rb=document.getElementById('p3Resume');if(rb)rb.onclick=resumeSession;
+    const bb=document.getElementById('p3Battle');if(bb&&!bb.disabled)bb.onclick=startBattle;
+  }
+  function openDaily(){renderDaily();showScreen("scDaily");screen.scrollTop=0}
   function addHomeCard(){
     const modes=document.querySelector("#scHome .modes");if(!modes||document.getElementById("modeDailyTide"))return;
     const s=stats(),el=document.createElement("div");el.className="mode p3-daily-cover";el.id="modeDailyTide";el.innerHTML='<div><div class="mtag">第三阶段 · 自动安排</div><div class="mname">今日潮汐</div><div class="mnum"><b id="p3HomeDue">'+s.due+'</b> 个到期词 · 预计 <span id="p3HomeMin">'+buildDailyQueue("quick").estimateMinutes+'</span> 分钟</div><small>复习、薄弱词和少量新词已经排好，点击一次直接开始。</small></div><button class="pri" id="btnDailyTide">继续今日学习</button>';

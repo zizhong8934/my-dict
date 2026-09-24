@@ -1,10 +1,44 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="wt-booting">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#43B7E6">
+<meta name="theme-color" content="#f3f9ff"><style id="wt-boot-style">
+html.wt-booting,html.wt-booting body{background:#f3f9ff!important;color:#102a4c}
+html.wt-booting[data-app-tone=dark],html.wt-booting[data-app-tone=dark] body{background:#061722!important;color:#edf6ff}
+html.wt-booting body>*:not(#wtBoot):not(script):not(style){visibility:hidden!important}
+#wtBoot{display:none}
+html.wt-booting #wtBoot{display:flex;position:fixed;inset:0;z-index:2147483646;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;background:inherit;font:16px/1.6 -apple-system,BlinkMacSystemFont,sans-serif;color:inherit}
+#wtBoot b{font-size:28px;letter-spacing:1px}
+#wtBoot p{color:inherit;font-size:15px;margin:12px 0}
+#wtBoot a{color:#fff;background:#086bd8;border-radius:16px;padding:12px 24px;text-decoration:none;min-height:44px}
+#wtBoot a[hidden]{display:none}
+</style>
+<script data-wt-boot>
+(function(){
+  const html=document.documentElement;
+  let failed=false,ready=false;
+  function tone(value){
+    html.dataset.appTone=value==='dark'?'dark':'light';
+    const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=value==='dark'?'#061722':'#f3f9ff';
+  }
+  try{const s=JSON.parse(localStorage.getItem('wordtide_v1')||'{}');tone(s.themeAppearance||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'))}catch(e){tone('light')}
+  function trouble(){
+    if(ready)return;
+    const p=document.getElementById('wtBootText'),a=document.getElementById('wtBootRetry');
+    if(p)p.textContent='加载尚未完成，请检查网络后重试。学习记录不会被清除。';
+    if(a)a.hidden=false;
+  }
+  const timer=setTimeout(trouble,18000);
+  window.addEventListener('error',e=>{if(!ready&&(e.target?.tagName==='SCRIPT'||e instanceof ErrorEvent)){failed=true;trouble()}},true);
+  window.WT_BOOT={tone,finish(){
+    if(failed||!window.WORDTIDE_THEME||!window.WORDTIDE_MEMORY||!window.OCEAN_HOME){trouble();return;}
+    ready=true;clearTimeout(timer);html.classList.remove('wt-booting');document.getElementById('wtBoot')?.remove();
+  }};
+})();
+</script>
+
 <meta name="apple-mobile-web-app-capable" content="yes">
 
 <meta name="apple-mobile-web-app-title" content="词潮">
@@ -1288,6 +1322,70 @@ body:has(#scTheme.dy-active.on) #topbar{display:none!important}
 #scTheme .dy-clean{display:flex;gap:10px;align-items:center;font-size:16px;color:var(--muted)}
 @media(min-width:760px){#scTheme .dy-shell{max-width:600px}#scTheme .dy-card{padding:28px}#scTheme .dy-object{height:210px}}
 @media(max-width:360px){#scTheme.dy-active{padding-left:12px;padding-right:12px}#scTheme .dy-heading h1{font-size:20px}#scTheme .dy-counter{font-size:15px;padding:8px}#scTheme .dy-card{padding:15px}#scTheme .dy-word{font-size:30px}#scTheme .dy-object{height:160px}#scTheme .dy-result-hero{padding:18px 10px;gap:8px}#scTheme .dy-result-hero .th-sum-ring,#scTheme .dy-result-hero svg{width:148px;height:148px}#scTheme .dy-result-hero>p{font-size:13px;padding:6px}}
+
+/* Match the ocean home and daily exercises, including the browser safe areas. */
+html{--app-bg:#f3f9ff;background:var(--app-bg)!important}
+html[data-app-tone=dark]{--app-bg:#061722}
+body{background-color:var(--app-bg)!important}
+body:has(#scDaily.on) #topbar{display:none!important}
+body:has(#scDaily.on) #cv,body.ox-home-visible #cv{visibility:hidden}
+#scHome:not(.ox-ready)>*{visibility:hidden!important}
+#scDaily{--pl-ink:#102a4c;--pl-muted:#48648a;--pl-paper:#f3f9ff;--pl-card:#fff;--pl-soft:#e8f3ff;--pl-line:#c9def1;--pl-ocean:var(--dy-tide-light);inset:0!important;padding:calc(18px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom))!important;max-height:var(--wt-visible-height,100dvh);background:var(--pl-paper)!important;color:var(--pl-ink);overflow:auto;overscroll-behavior-y:contain;box-sizing:border-box;color-scheme:light}
+#scDaily[data-tone=dark]{--pl-ink:#edf6ff;--pl-muted:#aec7df;--pl-paper:#061722;--pl-card:#0c2234;--pl-soft:#122f46;--pl-line:#214b67;--pl-ocean:var(--dy-tide-dark);color-scheme:dark}
+#scDaily *{box-sizing:border-box}
+#scDaily .pl-shell{max-width:620px;margin:0 auto;display:grid;gap:20px}
+#scDaily h1,#scDaily h2,#scDaily p{margin:0;color:inherit}
+#scDaily h1:before,#scDaily h2:before{display:none}
+#scDaily h2{font-size:20px;line-height:1.4}
+#scDaily p{line-height:1.6}
+#scDaily button{font:600 16px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:44px;padding:11px 16px;background:var(--pl-soft);color:var(--pl-ink);border:1px solid var(--pl-line);border-radius:16px;box-shadow:none;text-shadow:none;-webkit-text-fill-color:currentColor;touch-action:manipulation}
+#scDaily button:focus-visible,#scDaily summary:focus-visible{outline:3px solid #168bff;outline-offset:3px}
+#scDaily button:disabled{background:var(--pl-soft);color:var(--pl-muted);cursor:default;opacity:1}
+#scDaily .pl-header{display:flex;align-items:center;gap:10px}
+#scDaily .pl-round{width:44px;min-width:44px;height:44px;min-height:44px;border:0;border-radius:50%;padding:11px}
+#scDaily svg{width:24px;height:24px;display:block}
+#scDaily .pl-title{flex:1;min-width:0}
+#scDaily .pl-title h1{font-size:25px;line-height:1.2}
+#scDaily .pl-title p{font-size:13px;color:var(--pl-muted);margin-top:5px}
+#scDaily .pl-hero{border:1px solid var(--pl-line);border-radius:20px;overflow:hidden;background:var(--pl-ocean) center/cover}
+#scDaily .pl-hero-copy{padding:22px 22px 46px;background:linear-gradient(110deg,#f3f9fff2 15%,#f3f9ff88 65%,transparent)}
+#scDaily[data-tone=dark] .pl-hero-copy{background:linear-gradient(110deg,#061722f2 15%,#06172288 65%,transparent)}
+#scDaily .pl-eyebrow{font-size:14px;color:var(--pl-muted)}
+#scDaily .pl-hero h2{font-size:19px;margin-top:8px}
+#scDaily .pl-hero h2 strong{font-size:44px;line-height:1.1;margin-right:4px}
+#scDaily .pl-hero p{font-size:14px;margin-top:10px;max-width:250px}
+#scDaily .pl-resume{margin:0 12px 12px;padding:16px;background:var(--pl-card);border:1px solid var(--pl-line);border-radius:16px}
+#scDaily .pl-resume b{display:block;font-size:18px}
+#scDaily .pl-resume span{display:block;font-size:14px;color:var(--pl-muted);margin-top:6px}
+#scDaily .pl-progress{height:6px;background:var(--pl-soft);border-radius:9px;margin:14px 0}
+#scDaily .pl-progress i{display:block;height:100%;border-radius:inherit;background:#087fff}
+#scDaily button.pl-primary{width:100%;background:#086bd8;color:#fff;border:0;min-height:52px}
+#scDaily .pl-primary span{display:inline;color:inherit;font-size:18px;margin:0 0 0 8px}
+#scDaily .pl-hero-note{padding:14px 20px;background:var(--pl-card);color:var(--pl-muted);font-size:14px}
+#scDaily .pl-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#scDaily .pl-stats>div{padding:14px 6px;text-align:center;background:var(--pl-card);border:1px solid var(--pl-line);border-radius:16px}
+#scDaily .pl-stats b{font-size:27px;display:block;line-height:1.25}
+#scDaily .pl-stats span{display:block;font-size:14px;color:var(--pl-muted);margin-top:5px}
+#scDaily .pl-plans{display:grid;gap:12px}
+#scDaily .pl-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0}
+#scDaily .pl-section-head h2{font-size:19px}
+#scDaily .pl-section-head>span{color:var(--pl-muted);font-size:13px}
+#scDaily .pl-plan{padding:18px;background:var(--pl-card);border:1px solid var(--pl-line);border-radius:20px}
+#scDaily .pl-plan-top{display:flex;gap:12px;align-items:flex-start}
+#scDaily .pl-icon{padding:10px;background:var(--pl-soft);color:#076dd4;border-radius:12px;flex:none}
+#scDaily[data-tone=dark] .pl-icon{color:#76cfff}
+#scDaily .pl-plan p{font-size:14px;color:var(--pl-muted);margin-top:5px}
+#scDaily .pl-plan-bottom{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px}
+#scDaily .pl-plan-bottom>span{font-size:14px;color:var(--pl-muted)}
+#scDaily .pl-plan-bottom button:not(:disabled){background:#086bd8;color:#fff;border-color:#086bd8}
+#scDaily .pl-more{border:1px solid var(--pl-line);border-radius:16px;padding:4px 16px;background:var(--pl-card)}
+#scDaily .pl-more summary{padding:14px 0;font-size:16px;cursor:pointer;min-height:44px}
+#scDaily .pl-more h2{font-size:18px}
+#scDaily .pl-more p{font-size:14px;color:var(--pl-muted);margin:8px 0 14px}
+#scDaily .pl-battle{padding:10px 0 18px;border-bottom:1px solid var(--pl-line)}
+#scDaily .pl-explain{padding-top:18px}
+#scDaily .pl-footer{font-size:13px;text-align:center;color:var(--pl-muted)}
+@media(max-width:360px){#scDaily{padding-left:12px!important;padding-right:12px!important}#scDaily .pl-header{gap:7px}#scDaily .pl-title h1{font-size:22px}#scDaily .pl-title p{font-size:12px}#scDaily .pl-plan{padding:15px}#scDaily .pl-section-head{flex-wrap:wrap}}
 </style><link rel="icon" type="image/png" sizes="32x32" href="./wordtide-icon-32.png?v=20260922"><link rel="apple-touch-icon" sizes="180x180" href="./wordtide-icon-180.png?v=20260922"><link rel="manifest" href="./manifest.webmanifest?v=20260922"><style id="wt-unified-brand">
  #topbar #brand.wt-unified{display:flex;align-items:center;gap:7px;background:none;filter:none;color:#123d65;letter-spacing:0;max-width:none;flex-shrink:0}
  #topbar #brand .wt-brand-mark{display:block;width:34px;height:34px;max-width:none;flex-shrink:0;object-fit:contain}
@@ -1296,7 +1394,7 @@ body:has(#scTheme.dy-active.on) #topbar{display:none!important}
  @media(max-width:400px){#topbar{gap:5px;padding-left:10px;padding-right:10px}#topbar .chip{padding:5px 7px;gap:4px;font-size:12px}#topbar #wtAudioButton{padding:6px 7px;font-size:12px}#topbar .tb-sp{min-width:0}}
  @media(prefers-color-scheme:dark){#topbar #brand.wt-unified{color:#1a4c75}body:has(#scTheme.on) #topbar #brand.wt-unified{color:#eaf2fa}body:has(#scTheme.on) #topbar #brand small{color:#a9c4dc}}
  </style></head>
-<body>
+<body><div id="wtBoot" role="status" aria-live="polite"><b>词潮 WordTide</b><p id="wtBootText">正在准备你的学习页面…</p><a id="wtBootRetry" href="" hidden>重新加载</a></div>
 <canvas id="cv"></canvas>
 
 <div id="topbar">
@@ -1612,8 +1710,8 @@ body:has(#scTheme.dy-active.on) #topbar{display:none!important}
 <script src="./game-1.js?v=fb26a6da67"></script>
 <script src="./game-2.js?v=786b2c75b3"></script>
 <script src="./game-3.js?v=e3b31a0c95"></script>
-<script src="./game-4.js?v=b92a773443"></script>
+<script src="./game-4.js?v=bf9c84fe8b"></script>
 <script src="./game-5.js?v=ffa284150a"></script>
 <script src="./game-6.js?v=ad9df66765"></script>
-<script src="./game-7.js?v=229a7f1184"></script></body>
+<script src="./game-7.js?v=cb9643a8b6"></script></body>
 </html>
