@@ -73,7 +73,8 @@
   function mastered(it){return score(it)>=7}
   function mistakeCount(it){return S.themeMistakes[key(it)]|0}
   function mark(it,type,ok,meta){
-    const p=prog(it);if(run?.daily)recordDailyPresentation(it,ok,p); p.last=Date.now();
+    const p=prog(it);if(run?.daily&&ok&&(flowAssisted()||meta?.hintCount)){flowSupported(it,type,meta,p);return;}
+    if(run?.daily)recordDailyPresentation(it,ok,p); p.last=Date.now();
     /* 结算页要列出"这几个再看一眼"，所以本轮错过的词要留下来（去重）。
        原来只有一个 run.bad 计数，数字对了但说不出是哪几个 ——
        而人下一步想做的恰恰是把那几个再看一遍。 */
@@ -87,7 +88,7 @@
     else{p.bad=(p.bad|0)+1;S.themeMistakes[key(it)]=mistakeCount(it)+1;}
     syncToOriginal(it,p);
     S.themeStats.answers=(S.themeStats.answers|0)+1;if(ok)S.themeStats.correct=(S.themeStats.correct|0)+1;save();
-    try{if(window.WORDTIDE_MEMORY)window.WORDTIDE_MEMORY.recordTheme({wordId:key(it),themeId:itemSeaId(it),item:it,mode:type,correct:!!ok,hintCount:meta&&meta.hintCount||0,responseMs:run&&run.qStartedAt?Date.now()-run.qStartedAt:0})}catch(e){console.warn("统一记忆记录失败",e)}
+    try{if(window.WORDTIDE_MEMORY)window.WORDTIDE_MEMORY.recordTheme({wordId:key(it),themeId:itemSeaId(it),item:it,mode:type,correct:!!ok,dailyFlow:!!run?.daily,hintCount:meta&&meta.hintCount||0,responseMs:run&&run.qStartedAt?Date.now()-run.qStartedAt:0})}catch(e){console.warn("统一记忆记录失败",e)}
   }
   function overall(){const all=SEAS.flatMap(x=>x.items.map(i=>[x.id,i]));let done=0;for(const [sid,it] of all){const old=seaId;seaId=sid;if(mastered(it))done++;seaId=old;}return {done,total:all.length}}
   function toolProgress(){const old=seaId;seaId="tools";const done=CORE_TOOLS.filter(mastered).length;seaId=old;return done}
@@ -152,16 +153,17 @@
     if(!queue.length){toast("今天暂时没有可学习的词");return false}
     run={mode:"daily",phase:null,items:queue.slice(),queue:queue.slice(),i:0,ok:0,bad:0,t0:Date.now(),missed:[],lvUps:0,hp:100,def:3,requeued:{},rate:S.themeEchoRate||.78,build:null,mask:null,daily:true,dailyPlan:opts.plan||"quick",dailyOffset:opts.offset|0};
     const resuming=opts.resume||opts.offset>0;
+    if(resuming&&S.dailySession?.flowRetries)run.requeued={...S.dailySession.flowRetries};
     run.dailyResults=resuming&&Array.isArray(S.dailySession?.presentationAnswers)?S.dailySession.presentationAnswers.slice():[];
     if(resuming){run.ok=S.dailySession?.presentationTotals?.ok||0;run.bad=S.dailySession?.presentationTotals?.bad||0;for(const q of S.dailySession?.queue||[])if(q.reason==="错词回练")run.requeued[q.themeId+":"+q.id]=1;}
-    showScreen("scTheme");renderLesson();if(resuming)restoreDailyCheckpoint();return true;
+    showScreen("scTheme");renderLesson();if(resuming&&current()?._exercise!=="teach")restoreDailyCheckpoint();return true;
   }
   function current(){return run&&run.queue[run.i]}
   /* 答完之后停住，等人点「继续」。
      找不到容器时退回定时器 —— 宁可跳快了，也不能卡死在一道题上。 */
   function holdOn(){
     const active=run,index=run.i,phase=run.phase;
-    active.locked=true;if(run.daily)saveDailyCheckpoint();
+    active.locked=true;if(run.daily){flowFeedback();saveDailyCheckpoint();}
     const bar=document.getElementById('thGoOn');
     let btn=document.getElementById('thDailyConfirm')||document.getElementById('thCompleteCheck')||document.getElementById('thCheck')||document.getElementById('thColoCheck');
     if(btn){btn.id='thGoOnBtn';btn.textContent='继续 →';btn.classList.add('th-main');}
@@ -303,6 +305,7 @@
     else{mark(it,type,false);run.bad++;soundCue("bad");requeue(it);fb.className="th-feedback bad";
       /* 只退回第一个错的位置往后的部分。全推倒等于重做，
          而且没告诉你错在哪 —— 你只知道"不对"。 */
+      if(run.daily){fb.textContent="正确顺序："+full;screen.querySelector(".th-answer").classList.add("show");holdOn();return;}
       let keep=0;while(keep<b.selected.length&&samePart(b.selected[keep],keep))keep++;
       fb.textContent=keep
         ? "前 "+keep+" 块是对的，从第 "+(keep+1)+" 块开始再看看。"
@@ -478,7 +481,7 @@
       screen.querySelector('.th-answer').classList.add('show');speakAt(it.w,.74);holdOn();renderMask();
     }else{
       mark(it,'complete',false);run.bad++;soundCue('bad');requeue(it);fb.className='th-feedback bad';
-      fb.textContent='再试一次，请输入完整英文：'+it.w;
+      fb.textContent='正确拼写：'+it.w;if(run.daily){holdOn();renderMask();return;}
       screen.querySelector('.th-answer').classList.add('show');input.focus();input.select();
     }
   }
@@ -534,6 +537,7 @@
 
   function renderLesson(){
     const it=current();if(!it){summary();return}const mode=lessonMode(),isLearn=mode==="learn",isRecall=mode==="recall",isSent=mode==="sentence",isColo=mode==="colo",isListen=mode==="listen",isZh=mode==="zhpick",isPick=mode==="learn"||isListen,isAssemble=mode==="assemble"||isSent,isComplete=mode==="complete",isSpell=mode==="spell"||mode==="mistakes";
+    if(run.daily&&flowNeedsTeaching(it,mode)){flowTeaching(it);return;}
     run.qStartedAt=Date.now();
     if(isAssemble)ensureBuild(it);if(isComplete)ensureMask(it);if(isColo)ensureColo(it);if(isPick||isZh)ensurePick(it);
     let right="";   /* 答案面板挪到题目下面，见本函数末尾的 shell() */
@@ -582,7 +586,7 @@
           +'<div class="th-feedback" id="thFeedback"></div>'
           +'<div class="th-actions"><button id="thHear">🔊 听发音</button><button class="th-main" id="thColoCheck">检查</button></div>';
     }
-    const firstLook=(!run.daily||!isLearn)&&(isLearn||isZh)&&needsFirstLook(it);
+    const firstLook=!run.daily&&(isLearn||isZh)&&needsFirstLook(it);
     if(run.daily&&isLearn)right=dailyMeaning(it);
     if(firstLook)right=firstLookInline(it)+right.replace('四张图里，哪一张是这个意思？','先听读英文，再选出对应的图片。');
     const title=firstLook?"认识并练习":isListen?"听音选义":isZh?"中文选词":isPick?"看图选义":isRecall?"图片回忆":isSent?"句子拼写":isColo?"词语搭配":isAssemble?"词块组装":isComplete?"提示拼写":"最终默写",label=isListen?'听音':isZh?'选词':isLearn?'认识':isSent?'拼句':isColo?'搭配':isAssemble?'组装':isComplete?'补全':'默写';
@@ -594,7 +598,7 @@
       +'<div class="th-quiz">'+right+'<div class="th-goon" id="thGoOn"></div>'+info(it,true)+'</div></div>');
     screen.scrollTop=0;
     const feedback=document.getElementById('thFeedback');if(feedback){feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');}
-    if(run.daily)dailyLayout(it,mode);
+    if(run.daily){dailyLayout(it,mode);flowWire(it,mode);}
     wireFirstLook(it);
     const hear=document.getElementById('thHear');if(hear)hear.onclick=()=>{if(run.daily){speakAt(it.w,.78);return;}const sentence=it.ex?.[0]?.[0]||it.w;if(window.WT_AUDIO)WT_AUDIO.sequence([it.w,sentence],.78);else speakAt(it.w,.72)};
     if(isPick||isZh){
@@ -631,13 +635,13 @@
   }
   function gradeRecall(ok){const it=current();mark(it,"recall",ok);soundCue(ok?"ok":"bad");if(ok)run.ok++;else{run.bad++;requeue(it)}advanceLesson()}
   function norm(x){return String(x||"").toLowerCase().trim().replace(/[‐‑–—-]/g," ").replace(/\s+/g," ")}
-  function requeue(it){const k=key(it);if((run.requeued[k]|0)<1){run.requeued[k]=1;run.queue.push(run.daily?{...it,_reason:"错词回练"}:it);if(run.daily&&S.dailySession?.queue){S.dailySession.queue.push({themeId:itemSeaId(it),id:it.id,wordId:key(it),exercise:it._exercise||'spell',reason:'错词回练'});save()}}}
+  function requeue(it){if(run?.daily){flowRetry(it);return;}const k=key(it);if((run.requeued[k]|0)<1){run.requeued[k]=1;run.queue.push(run.daily?{...it,_reason:"错词回练"}:it);if(run.daily&&S.dailySession?.queue){S.dailySession.queue.push({themeId:itemSeaId(it),id:it.id,wordId:key(it),exercise:it._exercise||'spell',reason:'错词回练'});save()}}}
   function checkSpell(value){
     if(!run||run.locked||!current())return;
     if(!norm(value)){const fb=document.getElementById("thFeedback");if(fb){fb.className="th-feedback";fb.textContent="先输入英文答案。"}return;}
     const it=current(),ok=norm(value)===norm(it.w),fb=document.getElementById("thFeedback"),input=document.getElementById("thInput");if(!it||!fb)return;
     if(ok){mark(it,"spell",true);run.ok++;soundCue("ok");fb.className="th-feedback ok";fb.textContent="✓ 正确："+it.w;speakAt(it.w,.78);holdOn()}
-    else{mark(it,"spell",false);run.bad++;soundCue("bad");requeue(it);fb.className="th-feedback bad";fb.textContent="正确答案："+it.w+"（再输入一次）";screen.querySelector(".th-answer").classList.add("show");speakAt(it.w,.68);input.value="";input.placeholder=it.w;input.focus()}
+    else{mark(it,"spell",false);run.bad++;soundCue("bad");requeue(it);fb.className="th-feedback bad";fb.textContent="正确答案："+it.w;if(run.daily){screen.querySelector(".th-answer").classList.add("show");speakAt(it.w,.68);holdOn();return;}screen.querySelector(".th-answer").classList.add("show");speakAt(it.w,.68);input.value="";input.placeholder=it.w;input.focus()}
   }
 
   function renderMonster(){
@@ -668,6 +672,107 @@
     let i=0;const next=()=>{els.forEach(x=>x.classList.remove("on"));if(i>=chunks.length)return;els[i].classList.add("on");speakAt(chunks[i],Math.max(.55,run.rate-.08));i++;echoTimer=setTimeout(next,Math.max(1050,1500/run.rate))};next()
   }
 
+  function flowPosition(){return (run.dailyOffset|0)+run.i}
+  function flowAssisted(){return !!(run.helpPosition===flowPosition()||S.dailySession?.learningHelp?.[flowPosition()]||run.pick?.hinted||run.mask?.hints)}
+  function flowHelp(){
+    if(!run?.daily||run.locked)return;
+    run.helpPosition=flowPosition();
+    const s=S.dailySession;if(s){s.learningHelp=s.learningHelp||{};s.learningHelp[flowPosition()]=true;save()}
+  }
+  function flowRef(it){return {themeId:itemSeaId(it),id:it.id,wordId:key(it),exercise:it._exercise,reason:it._reason}}
+  function flowSaveQueue(){
+    const s=S.dailySession;if(!s||s.completed||!Array.isArray(s.queue))return;
+    s.queue=s.queue.slice(0,run.dailyOffset|0).concat(run.queue.map(flowRef));save();
+  }
+  function flowNeedsTeaching(it,mode){
+    if(mode==="teach")return true;
+    if(!["learn","zhpick"].includes(mode)||!it._reason?.includes("新词"))return false;
+    const st=window.WORDTIDE_MEMORY?.getState(key(it));
+    return !st?.introducedAt&&(!st||st.status==="new")&&needsFirstLook(it);
+  }
+  function flowTeaching(it){
+    // Upgrade an unfinished legacy lesson without deleting its completed positions.
+    if(it._exercise!=="teach"){
+      const test={...it,_exercise:"zhpick",_reason:"新词回忆"};
+      it._exercise="teach";
+      run.queue.splice(Math.min(run.queue.length,run.i+3),0,test);
+      flowSaveQueue();
+    }
+    dailyShell("先认识，再回忆",'<div class="flow-teach">'
+      +(it.img?'<div class="dy-object"><img src="'+esc(it.img)+'" alt="'+esc(it.zh)+'"></div>':'')
+      +'<p class="th-build-sub">先认识 · 这一步不计对错</p>'
+      +'<h2 class="dy-word">'+esc(it.w)+'</h2><p class="dy-pronunciation">'+esc(it.ipa||it.sy||'')+'</p>'
+      +'<h3>'+esc(it.zh)+'</h3>'
+      +(it.ex?.[0]?'<p class="th-build-sub">'+esc(it.ex[0][0])+'<br>'+esc(it.ex[0][1])+'</p>':'')
+      +'<p class="th-tip">先把声音、英文和意思联系起来。接下来会遮住答案，再试着回忆。</p></div>');
+    screen.dataset.exercise="teach";
+    const controls=document.getElementById("dyControls");
+    controls.innerHTML='<div class="th-actions"><button id="flowHear">'+dailyIcon("sound")+'听单词</button><button id="flowSlow">'+dailyIcon("sound")+'慢速再听</button><button class="th-main" id="flowReady">认识了，继续 →</button></div>';
+    document.getElementById("flowHear").onclick=()=>speakAt(it.w,.78);
+    document.getElementById("flowSlow").onclick=()=>speakAt(it.w,.6);
+    const active=run,index=run.i;
+    document.getElementById("flowReady").onclick=()=>{
+      if(run!==active||run.i!==index||run.locked)return;
+      window.WORDTIDE_MEMORY?.recordExposure(key(it));
+      const s=S.dailySession;if(s){s.introduced=s.introduced||[];if(!s.introduced.includes(key(it)))s.introduced.push(key(it))}
+      advanceLesson();
+    };
+    screen.scrollTop=0;
+  }
+  function flowRetry(it){
+    const k=key(it),s=S.dailySession;
+    const count=Object.keys(run.requeued||{}).length;
+    if(run.requeued[k]||count>=4)return false;
+    // A later scheduled occurrence can already serve as the retry.
+    if(run.queue.slice(run.i+1).some(x=>key(x)===k&&x._exercise!=="teach"))return true;
+    if(new Set(run.queue.slice(run.i+1).map(key)).size<2)return false;
+    run.requeued[k]=1;
+    run.queue.splice(Math.min(run.queue.length,run.i+3),0,{...it,_reason:"错词回练"});
+    if(s){s.flowRetries={...run.requeued};flowSaveQueue()}
+    return true;
+  }
+  function flowWire(it,mode){
+    if(!run?.daily)return;
+    if(mode==="spell"){
+      const tip=screen.querySelector(".th-quiz>.th-tip");
+      if(tip)tip.textContent="输入完整英文。答错先看讲解，再安排穿插回练或后续复习。";
+    }
+    const controls=document.getElementById("dyControls");
+    const note=document.createElement("p");note.className="th-tip";note.id="flowHelpNote";note.setAttribute("role","status");
+    const update=()=>{note.textContent=flowAssisted()?"已使用提示：本题算辅助练习，不算独立记住。":"先自己回忆；需要时可以用提示，不会扣分。"};
+    update();controls?.appendChild(note);
+    const exposesAudio=["zhpick","spell","complete","assemble","sentence","colo","recall"].includes(mode);
+    for(const id of ["dyHint","thCompleteHint",...(exposesAudio?["dyHear","thHear"]:[])]){
+      document.getElementById(id)?.addEventListener("click",()=>{if(!run.locked){flowHelp();update()}},true);
+    }
+    if(flowAssisted())run.pick&&(run.pick.hinted=true);
+  }
+  function flowSupported(it,type,meta,p){
+    const hints=Math.max(1,meta?.hintCount||0);
+    recordDailyPresentation(it,true,p,{hintCount:hints});
+    const a=run.dailyResults.find(x=>x.position===flowPosition());
+    if(a){a.assisted=true;a.firstCorrect=false}
+    if(S.dailySession)S.dailySession.presentationAnswers=run.dailyResults.map(x=>({...x}));
+    S.themeStats.answers=(S.themeStats.answers|0)+1;
+    S.themeStats.hints=(S.themeStats.hints|0)+1;
+    window.WORDTIDE_MEMORY?.recordTheme({wordId:key(it),themeId:itemSeaId(it),mode:type,correct:true,hintCount:hints,dailyFlow:true});
+    flowRetry(it);save();
+  }
+  function flowFeedback(){
+    if(!run?.daily)return;
+    const it=current(),a=run.dailyResults?.find(x=>x.position===flowPosition()),fb=document.getElementById("thFeedback");
+    if(a?.assisted&&fb)fb.textContent="✓ 借助提示完成："+it.w+"。稍后再独立试一次。";
+    if(a&&!a.correct){
+      screen.querySelector(".th-answer")?.classList.add("show");
+      const explanation=screen.querySelector(".dy-explanation");if(explanation)explanation.open=true;
+    }
+    const note=document.getElementById("flowHelpNote");
+    if(note&&(a?.assisted||a&&!a.correct)){
+      const later=run.queue.slice(run.i+1).some(x=>key(x)===key(it));
+      note.textContent=later?"已安排本轮回练，先看讲解，再继续。":"本轮到这里就好，这个词已安排后续复习。";
+    }
+  }
+
   function dailyIcon(name){
     const paths={back:'m14 5-7 7 7 7',sound:'M11 4 6 8H3v8h3l5 4V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14',hint:'M9 18h6m-5 3h4M8 15c-6-5-2-12 4-12s10 7 4 12l-1 3H9l-1-3',bolt:'m14 2-9 12h6l-1 8 9-12h-6l1-8',wave:'M2 9c4-6 6 6 10 0s6 6 10 0M2 16c4-6 6 6 10 0s6 6 10 0',again:'M20 7v5h-5M20 12a8 8 0 1 0-2 6',check:'m5 12 4 4 10-10'};
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+(paths[name]||paths.wave)+'"/></svg>';
@@ -684,8 +789,9 @@
     return 'consolidate';
   }
   function dailyMeta(it){
-    const kind=dailyKind(it),label=({new:'今日新词',weak:'薄弱词',review:'到期复习',consolidate:'提前巩固'})[kind];
+    const kind=dailyKind(it),label=it?._reason==='新词回忆'?'新词回忆':({new:'今日新词',weak:'薄弱词',review:'到期复习',consolidate:'提前巩固'})[kind];
     const reasons={new:'这是尚未熟悉的词。先听读，再用图片和词义建立联系。',weak:'这个词之前答错过，本轮安排再次练习。',review:'这个词到了复习时间，用一次回忆巩固记忆。',consolidate:'趁记忆还在，提前练习一次。'};
+    if(it?._reason==='新词回忆')reasons.new='刚才认识过这个词。现在遮住答案，试着自己回忆；需要时再用提示。';
     return '<div class="dy-meta"><span class="dy-badge dy-'+kind+'">'+label+'</span><details class="dy-reason"><summary>为什么出现这个词？</summary><p>'+reasons[kind]+'</p></details></div>';
   }
   function dailyShell(title,body){
@@ -695,7 +801,7 @@
     const minutes=Math.max(1,Math.round(total*.42)),kind=dailyKind(current());
     const counts={review:0,consolidate:0,new:0};
     for(const it of run.items){const k=dailyKind(it);counts[k==='weak'?'review':k]++;}
-    screen.innerHTML='<div class="dy-shell"><header class="dy-header"><button id="thExit" class="dy-back" aria-label="返回今日计划">'+dailyIcon('back')+'</button><div class="dy-heading"><h1><span>'+dailyIcon(plan==='quick'?'bolt':'wave')+'</span>'+name+'</h1><p>'+total+' 题 · 约 '+minutes+' 分钟</p></div><div class="dy-counter"><b>'+Math.min(index+1,total)+'</b> / '+total+'</div></header>'
+    screen.innerHTML='<div class="dy-shell"><header class="dy-header"><button id="thExit" class="dy-back" aria-label="返回今日计划">'+dailyIcon('back')+'</button><div class="dy-heading"><h1><span>'+dailyIcon(plan==='quick'?'bolt':'wave')+'</span>'+name+'</h1><p>'+total+' 步 · 约 '+minutes+' 分钟</p></div><div class="dy-counter"><b>'+Math.min(index+1,total)+'</b> / '+total+'</div></header>'
       +'<div class="dy-progress" role="progressbar" aria-label="本轮学习进度" aria-valuemin="0" aria-valuemax="'+total+'" aria-valuenow="'+index+'"><i style="width:'+Math.min(100,index/Math.max(1,total)*100)+'%"></i></div>'
       +(plan!=='quick'?'<div class="dy-mix" aria-label="新旧词交错练习">'+[['review','复习'],['consolidate','巩固'],['new','新词']].map(([k,n])=>'<span class="'+((kind==='weak'?'review':kind)===k?'active':'')+'">'+n+' <b>'+counts[k]+'</b></span>').join('')+'</div>':'')
       +'<section class="th-panel th-lesson on dy-card">'+dailyMeta(current())+body+'</section><div class="dy-controls" id="dyControls"></div><div class="dy-foot"><span>'+esc(title)+' · '+esc(seaFor(current()).name)+'</span><button id="dyAudio">声音设置</button></div></div>';
@@ -791,16 +897,17 @@
   function dailySummary(){
     dailyTone();screen.dataset.exercise='summary';
     const results=run.dailyResults||[],done=results.length,right=results.filter(x=>x.firstCorrect).length,wrong=done-right;
-    const newIds=new Set(results.filter(x=>x.wasNew).map(x=>x.themeId+':'+x.id));
-    const newCount=new Set(results.filter(x=>x.correct&&newIds.has(x.themeId+':'+x.id)).map(x=>x.themeId+':'+x.id)).size;
+    const newIds=new Set([...(S.dailySession?.introduced||[]),...results.filter(x=>x.wasNew).map(x=>x.themeId+':'+x.id)]);
+    const newCount=newIds.size;
     const elapsed=Date.now()-(S.dailySession?.startedAt||run.t0||Date.now());
     const missed=results.filter(x=>!x.firstCorrect).map(x=>{const it=SEAS.find(s=>s.id===x.themeId)?.items.find(it=>it.id===x.id);return it?{...it,_seaId:x.themeId}:null}).filter(Boolean).filter((it,i,a)=>a.findIndex(x=>key(x)===key(it))===i);
     if(window.WORDTIDE_MEMORY&&!run.summarySaved){window.WORDTIDE_MEMORY.completeSession({ok:run.ok,bad:run.bad,firstCorrect:right,completedQuestions:done,newRecognized:newCount});run.summarySaved=true;}
     const R=52,C=2*Math.PI*R,off=C*(1-right/Math.max(1,done));
     screen.innerHTML='<div class="dy-shell dy-finished"><header class="dy-header"><button class="dy-back" id="thDailyBack" aria-label="返回今日计划">'+dailyIcon('back')+'</button><div class="dy-heading"><h1>本次练习完成</h1><p>本轮记录已保存</p></div></header><section class="th-summary">'
-      +'<div class="dy-result-hero"><div class="th-sum-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="th-ring-bg" cx="60" cy="60" r="52"></circle><circle class="th-ring-fg" cx="60" cy="60" r="52" style="stroke-dasharray:'+C+';stroke-dashoffset:'+off+'"></circle></svg><div class="th-sum-num"><b>'+right+'<small> / '+done+'</small></b><span>首次答对</span><em>用时 '+fmtDur(elapsed)+'</em></div></div><p>每一次回忆<br>都让记忆更牢固</p></div>'
-      +'<div class="th-sum-stats dy-stats"><div><span>首次答对</span><b>'+right+'</b></div><div><span>需要巩固</span><b>'+wrong+'</b></div><div><span>新认识</span><b>'+newCount+'</b></div></div>'
-      +(missed.length?'<h2 class="dy-miss-title">这几个再看一眼</h2><div>'+missed.map((it,i)=>'<div class="th-miss-row">'+(it.img?'<img src="'+esc(it.img)+'" alt="">':'<span class="th-miss-icon">'+esc(it.icon||'')+'</span>')+'<div><b>'+esc(it.w)+'</b><small>'+esc(it.ipa||it.sy||'')+'</small><span>'+esc(it.zh)+'</span></div><button class="th-miss-redo" id="dyRedo'+i+'">'+dailyIcon('again')+'重练</button></div>').join('')+'</div>':'<p class="dy-clean">'+dailyIcon('check')+'这一轮全部一次答对</p>')
+      +'<div class="dy-result-hero"><div class="th-sum-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="th-ring-bg" cx="60" cy="60" r="52"></circle><circle class="th-ring-fg" cx="60" cy="60" r="52" style="stroke-dasharray:'+C+';stroke-dashoffset:'+off+'"></circle></svg><div class="th-sum-num"><b>'+right+'<small> / '+done+'</small></b><span>独立答对</span><em>用时 '+fmtDur(elapsed)+'</em></div></div><p>每一次回忆<br>都让记忆更牢固</p></div>'
+      +'<div class="th-sum-stats dy-stats"><div><span>独立答对</span><b>'+right+'</b></div><div><span>需要巩固</span><b>'+wrong+'</b></div><div><span>新认识</span><b>'+newCount+'</b></div></div>'
+      +'<p class="th-tip">借助提示完成 '+results.filter(x=>x.assisted).length+' 次 · 初次答错 '+results.filter(x=>!x.firstCorrect&&!x.assisted).length+' 次。认识新词不计对错；后续会逐步练到完整拼写。</p>'
+      +(missed.length?'<h2 class="dy-miss-title">这几个再看一眼</h2><div>'+missed.map((it,i)=>'<div class="th-miss-row">'+(it.img?'<img src="'+esc(it.img)+'" alt="">':'<span class="th-miss-icon">'+esc(it.icon||'')+'</span>')+'<div><b>'+esc(it.w)+'</b><small>'+esc(it.ipa||it.sy||'')+'</small><span>'+esc(it.zh)+'</span></div><button class="th-miss-redo" id="dyRedo'+i+'">'+dailyIcon('again')+'重练</button></div>').join('')+'</div>':'<p class="dy-clean">'+dailyIcon('check')+'这一轮全部一次独立答对</p>')
       +'<div class="dy-saved">'+dailyIcon('check')+'<div><b>学习进度已同步到本机</b><p>错词与新词会按记忆情况安排复习。</p></div></div>'
       +'<div class="th-actions dy-end-actions"><button class="th-main" id="thDailyAgain">再来一轮</button><button id="thDailyHome">回今日计划</button><button class="dy-text-btn" id="dyThemeHub">回主题大厅</button></div></section></div>';
     screen.scrollTop=0;

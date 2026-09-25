@@ -72,8 +72,52 @@
   function nextInterval(days){if(days<1)return 1;if(days<3)return 3;if(days<7)return 7;if(days<14)return 14;if(days<30)return 30;if(days<60)return 60;if(days<120)return 120;return Math.min(240,Math.round(days*1.7))}
   function isProductive(skill){return skill==="spell"||skill==="listen"||skill==="sentence"||skill==="battle"}
 
+  // A first encounter is exposure, never a scored answer.
+  function recordExposure(wordId){
+    const st=getState(wordId);if(!st)return;
+    if(st.status==="new")st.status="learning";
+    st.introducedAt=st.introducedAt||now();st.lastSeenAt=now();
+    if(!st.dueAt)st.dueAt=now()+TEN_MIN;
+    persist();
+  }
+  function learningQueue(refs,limit){
+    const base=[];let cost=0;
+    for(const ref of refs){
+      const st=getState(ref.wordId),fresh=st&&st.status==="new",n=fresh?2:1;
+      if(cost+n>limit)continue;
+      base.push({...ref,exercise:fresh?"teach":ref.exercise});cost+=n;
+    }
+    const out=[],pending=[];
+    while(base.length||pending.length){
+      const ready=pending.findIndex(x=>x.after<=out.length);
+      let next;
+      if(base[0]?.exercise==="teach"&&out.at(-1)?.exercise!=="teach")next=base.shift();
+      else if(ready>=0)next=pending.splice(ready,1)[0].ref;
+      else if(base.length)next=base.shift();
+      else next=pending.shift().ref;
+      out.push(next);
+      if(next.exercise==="teach")pending.push({after:out.length+2,ref:{...next,exercise:"zhpick",reason:"新词回忆"}});
+    }
+    return out;
+  }
+  function recordSupportedAnswer(evt,st,t,skill,hints){
+    st.seen++;st.lastSeenAt=t;st.hints+=Math.max(1,hints);
+    st.supported=(st.supported|0)+1;
+    if(st.status==="new")st.status="learning";
+    st.dueAt=t+TEN_MIN;
+    st.recent={at:t,mode:evt.mode,skill,correct:true,independent:false,hintCount:Math.max(1,hints)};
+    S.memoryEvents.push({...st.recent,wordId:evt.wordId,themeId:evt.themeId,dueAt:st.dueAt,intervalDays:st.intervalDays});
+    if(S.memoryEvents.length>MAX_EVENTS)S.memoryEvents.splice(0,S.memoryEvents.length-MAX_EVENTS);
+    S.memoryStats.answers=(S.memoryStats.answers|0)+1;
+    S.memoryStats.supported=(S.memoryStats.supported|0)+1;
+    S.memoryStats.hints=(S.memoryStats.hints|0)+Math.max(1,hints);
+    persist();window.dispatchEvent(new CustomEvent("wordtide-memory-updated"));return st;
+  }
+
   function recordAnswer(evt){
     evt=evt||{};const ref=refFor(evt.wordId);if(!ref)return null;const st=getState(evt.wordId),t=now(),skill=skillFor(evt.mode),correct=!!evt.correct,hints=Math.max(0,evt.hintCount|0),responseMs=Math.max(0,evt.responseMs|0);
+    if(evt.dailyFlow&&correct&&hints)return recordSupportedAnswer(evt,st,t,skill,hints);
+    const previousCorrect=st.lastCorrectAt;
     st.seen++;st.lastSeenAt=t;st.hints+=hints;
     if(correct){
       st.correct++;st.lastCorrectAt=t;st.skills[skill]=Math.min(5,(st.skills[skill]||0)+1);
@@ -85,7 +129,7 @@
       }else if(hints>0){
         st.status=st.intervalDays>=14?"stable":"review";st.dueAt=t+Math.min(DAY,Math.max(TEN_MIN,(st.intervalDays||1)*DAY*.35));
       }else{
-        st.intervalDays=nextInterval(st.intervalDays);st.stability=Math.min(10,st.stability+1);st.status=st.intervalDays>=14?"stable":"review";st.dueAt=t+st.intervalDays*DAY;
+        st.intervalDays=evt.dailyFlow&&previousCorrect&&new Date(previousCorrect).toDateString()===new Date(t).toDateString()?st.intervalDays:nextInterval(st.intervalDays);if(!evt.dailyFlow||!previousCorrect||new Date(previousCorrect).toDateString()!==new Date(t).toDateString())st.stability=Math.min(10,st.stability+1);st.status=st.intervalDays>=14?"stable":"review";st.dueAt=t+Math.max(TEN_MIN,st.intervalDays*DAY);
       }
       st.difficulty=Math.max(1,st.difficulty-(hints?0:.08));
     }else{
@@ -146,7 +190,8 @@
     if(plan==="review"&&!out.length)soon.slice(0,limit).forEach(add);
     const preferred=fresh.sort((a,b)=>newWordPriority(b)-newWordPriority(a)||wordLength(a.ref)-wordLength(b.ref));preferred.slice(0,newCap).forEach(add);
     if(out.length<limit&&plan!=="review")soon.forEach(add);
-    return {plan,queue:plan==="review"?out:mixStudyQueue(out),counts:{due:due.length,newWords:fresh.length,soon:soon.length,limit,newCap},estimateMinutes:Math.max(1,Math.round(out.length*.42))};
+    const queue=learningQueue(plan==="review"?out:mixStudyQueue(out),limit);
+    return {plan,queue,counts:{due:due.length,newWords:fresh.length,soon:soon.length,limit,newCap},estimateMinutes:Math.max(1,Math.round(queue.length*.42))};
   }
   function buildBattleQueue(){
     const t=now(),all=catalog().map(ref=>({ref,st:getState(ref.wordId)})).filter(x=>x.st.status!=="new"&&(x.st.dueAt<=t||x.st.skills.spell>0||x.st.skills.battle>0));
@@ -188,14 +233,14 @@
   function renderDaily(){
     const s=stats(),quick=buildDailyQueue('quick'),standard=buildDailyQueue('standard'),review=buildDailyQueue('review'),battle=buildBattleQueue(),resume=sessionUsable()?S.dailySession:null;
     const tone=S.themeAppearance==='dark'?'dark':'light';screen.dataset.tone=tone;
-    const planCard=(plan,title,icon,description)=>'<article class="pl-plan"><div class="pl-plan-top"><span class="pl-icon">'+planIcon(icon)+'</span><div><h2>'+title+'</h2><p>'+description+'</p></div></div><div class="pl-plan-bottom"><span>'+plan.queue.length+' 题 · 约 '+plan.estimateMinutes+' 分钟</span><button '+(plan.queue.length?'':'disabled ')+'data-plan="'+plan.plan+'">'+(plan.queue.length?'开始学习':'暂无内容')+' <span aria-hidden="true">→</span></button></div></article>';
+    const planCard=(plan,title,icon,description)=>'<article class="pl-plan"><div class="pl-plan-top"><span class="pl-icon">'+planIcon(icon)+'</span><div><h2>'+title+'</h2><p>'+description+'</p></div></div><div class="pl-plan-bottom"><span>'+plan.queue.length+' 步 · 约 '+plan.estimateMinutes+' 分钟</span><button '+(plan.queue.length?'':'disabled ')+'data-plan="'+plan.plan+'">'+(plan.queue.length?'开始学习':'暂无内容')+' <span aria-hidden="true">→</span></button></div></article>';
     screen.innerHTML='<div class="pl-shell"><header class="pl-header"><button id="p3Back" class="pl-round" aria-label="返回首页">'+planIcon('back')+'</button><div class="pl-title"><h1>今日潮汐</h1><p>复习一点，也认识新词</p></div><button id="plAudio" class="pl-round" aria-label="声音设置">'+planIcon('sound')+'</button><button id="plTone" class="pl-round" aria-label="'+(tone==='dark'?'切换浅色模式':'切换深色模式')+'">'+planIcon(tone==='dark'?'sun':'moon')+'</button></header>'
       +'<section class="pl-hero"><div class="pl-hero-copy"><span class="pl-eyebrow">今天的学习</span><h2><strong>'+s.due+'</strong> 个词到期</h2><p>'+(s.due?'先温习旧词，让记忆更牢固。':'没有到期词，按自己的节奏来。')+'</p></div>'
       +(resume?'<div class="pl-resume"><div><b>接着上次继续</b><span>'+labelPlan(resume.plan)+' · 停在第 '+(resume.index+1)+' / '+resume.queue.length+' 题</span></div><div class="pl-progress" role="progressbar" aria-label="上次学习进度" aria-valuemin="0" aria-valuemax="'+resume.queue.length+'" aria-valuenow="'+resume.index+'"><i style="width:'+Math.round(resume.index/resume.queue.length*100)+'%"></i></div><button class="pl-primary" id="p3Resume">继续上次学习 <span aria-hidden="true">→</span></button></div>':'<div class="pl-hero-note">新词与复习穿插出现，不用从头重来。</div>')+'</section>'
       +'<div class="pl-stats" aria-label="学习概况">'+[['薄弱词',s.weak],['正在巩固',s.learning],['稳定记忆',s.stable]].map(([label,n])=>'<div><b>'+n+'</b><span>'+label+'</span></div>').join('')+'</div>'
       +'<section class="pl-plans"><div class="pl-section-head"><h2>'+(resume?'也可以开始新一轮':'选一轮，开始学习')+'</h2><span>自动安排题型</span></div>'
-      +planCard(quick,'快速学习','bolt','复习与少量新词，短暂空闲也能练。')
-      +planCard(standard,'标准学习','wave','多练一会儿，穿插复习、错词和新词。')
+      +planCard(quick,'快速学习','bolt','先认识，再遮住答案回忆；初始最多 12 步，回练最多加 4 步。')
+      +planCard(standard,'标准学习','wave','按掌握程度练到全词拼写；初始最多 20 步，回练最多加 4 步。')
       +planCard(review,'专注复习','again',s.due?'优先温习到期内容，不加新词。':review.queue.length?'今天没有到期词，可以提前巩固。':'还没有学过的词，先从快速学习开始。')+'</section>'
       +'<details class="pl-more"><summary>实战与学习说明</summary><section class="pl-battle"><h2>今日塔防</h2><p>'+(battle.length?'用 '+battle.length+' 个学过的词进行实战练习。':'完成一些单词学习后，即可进入今日塔防。')+'</p><button id="p3Battle" '+(battle.length?'':'disabled')+'>进入今日塔防</button></section><section class="pl-explain"><h2>为什么出现这些词？</h2><p>到期复习：按记忆情况安排温习。<br>薄弱词：最近答错过，需要多练一次。<br>新词：复习量允许时，少量穿插加入。</p><p>当天答对是开始，跨天独立回忆才会逐步成为稳定记忆。</p></section></details>'
       +'<p class="pl-footer">学习记录保存在当前浏览器</p></div>';
@@ -221,6 +266,6 @@
   ensure();screen=document.createElement("div");screen.className="screen";screen.id="scDaily";document.body.appendChild(screen);addHomeCard();
   const oldRefresh=window.refreshHome||null;if(oldRefresh)window.refreshHome=function(){oldRefresh();if(!S.wordState||!Array.isArray(S.memoryEvents))ensure();updateHome()};
   window.addEventListener("wordtide-memory-updated",updateHome);
-  window.WORDTIDE_MEMORY={version:VERSION,catalog,stats,getState,recordAnswer,recordTheme,recordOriginal,buildDailyQueue,buildBattleQueue,startPlan,startBattle,consumeBattleQueue,resumeSession,updateSession,completeSession,openDaily,renderDaily};
+  window.WORDTIDE_MEMORY={version:VERSION,catalog,stats,getState,recordExposure,recordAnswer,recordTheme,recordOriginal,buildDailyQueue,buildBattleQueue,startPlan,startBattle,consumeBattleQueue,resumeSession,updateSession,completeSession,openDaily,renderDaily};
 })();
 
