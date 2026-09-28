@@ -594,7 +594,7 @@
     const title=firstLook?"认识并练习":isListen?"听音选义":isZh?"中文选词":isPick?"看图选义":isRecall?"图片回忆":isSent?"句子拼写":isColo?"词语搭配":isAssemble?"词块组装":isComplete?"提示拼写":"最终默写",label=isListen?'听音':isZh?'选词':isLearn?'认识':isSent?'拼句':isColo?'搭配':isAssemble?'组装':isComplete?'补全':'默写';
     /* 看图选义 / 中文选词没有照片（那张大图就是答案）。不加 th-solo 的话，
        内容会掉进两列网格的第一列里，右边空一半 —— 就是排版难看的根源。 */
-    const solo=isPick||isZh;
+    const solo=isPick||isZh||!it.img;
     shell(title,'<div class="th-lesson-card'+(solo?' th-solo':'')+'">'
       +(solo?'':visual(it,label))
       +'<div class="th-quiz">'+right+'<div class="th-goon" id="thGoOn"></div>'+info(it,true)+'</div></div>');
@@ -706,13 +706,14 @@
       +'<p class="th-build-sub">先认识 · 这一步不计对错</p>'
       +'<h2 class="dy-word">'+esc(it.w)+'</h2><p class="dy-pronunciation">'+esc(it.ipa||it.sy||'')+'</p>'
       +'<h3>'+esc(it.zh)+'</h3>'
-      +(it.ex?.[0]?'<p class="th-build-sub">'+esc(it.ex[0][0])+'<br>'+esc(it.ex[0][1])+'</p>':'')
+      +(it.ex?.[0]?'<div class="th-example flow-example"><strong>'+esc(it.ex[0][0])+'</strong>'+esc(it.ex[0][1])+'</div>':'')
       +'<p class="th-tip">先把声音、英文和意思联系起来。接下来会遮住答案，再试着回忆。</p></div>');
     screen.dataset.exercise="teach";
     const controls=document.getElementById("dyControls");
     controls.innerHTML='<div class="th-actions"><button id="flowHear">'+dailyIcon("sound")+'听单词</button><button id="flowSlow">'+dailyIcon("sound")+'慢速再听</button><button class="th-main" id="flowReady">认识了，继续 →</button></div>';
     document.getElementById("flowHear").onclick=()=>speakAt(it.w,.78);
     document.getElementById("flowSlow").onclick=()=>speakAt(it.w,.6);
+    dailySentenceAudio(it,"teach");
     const active=run,index=run.i;
     document.getElementById("flowReady").onclick=()=>{
       if(run!==active||run.i!==index||run.locked)return;
@@ -743,7 +744,7 @@
     const controls=document.getElementById("dyControls");
     const note=document.createElement("p");note.className="th-tip";note.id="flowHelpNote";note.setAttribute("role","status");
     const update=()=>{note.textContent=flowAssisted()?"已使用提示：本题算辅助练习，不算独立记住。":"先自己回忆；需要时可以用提示，不会扣分。"};
-    update();controls?.appendChild(note);
+    update();controls?.before(note);
     const exposesAudio=["zhpick","spell","complete","assemble","sentence","colo","recall"].includes(mode);
     for(const id of ["dyHint","thCompleteHint",...(exposesAudio?["dyHear","thHear"]:[])]){
       document.getElementById(id)?.addEventListener("click",()=>{if(!run.locked){flowHelp();update()}},true);
@@ -764,6 +765,7 @@
   function flowFeedback(){
     if(!run?.daily)return;
     const it=current(),a=run.dailyResults?.find(x=>x.position===flowPosition()),fb=document.getElementById("thFeedback");
+    if(a)screen.querySelector(".th-answer")?.classList.add("show");
     if(a?.assisted&&fb)fb.textContent="✓ 借助提示完成："+it.w+"。稍后再独立试一次。";
     if(a&&!a.correct){
       screen.querySelector(".th-answer")?.classList.add("show");
@@ -845,12 +847,36 @@
     const hear=document.getElementById('thHear');if(hear)hear.innerHTML=dailyIcon('sound')+'发音';
     const hint=document.getElementById('thCompleteHint');if(hint)hint.innerHTML=dailyIcon('hint')+'提示';
     const btn=document.getElementById('thCompleteCheck')||document.getElementById('thCheck')||document.getElementById('thColoCheck');if(btn)btn.textContent='提交答案';
-    const feedback=document.getElementById('thFeedback');if(feedback)controls.insertBefore(feedback,controls.firstChild);
+    const feedback=document.getElementById('thFeedback');if(feedback)controls.before(feedback);
     const answer=quiz.querySelector('.th-answer');
     if(answer){
       const details=document.createElement('details');details.className='dy-explanation';
       const label=document.createElement('summary');label.textContent='查看单词与例句';
-      details.appendChild(label);details.appendChild(answer);if(mode==='recall')controls.before(details);else controls.after(details);
+      details.appendChild(label);details.appendChild(answer);controls.before(details);
+    }
+    dailySentenceAudio(it,mode);
+  }
+  function dailySentenceAudio(it,mode){
+    function play(text){
+      if(mode!=="teach"&&!run.locked){
+        flowHelp();
+        const note=document.getElementById('flowHelpNote');
+        if(note)note.textContent='已使用提示：本题算辅助练习，不算独立记住。';
+      }
+      speakAt(text,.78);
+    }
+    screen.querySelectorAll('.th-example').forEach(example=>{
+      const text=example.querySelector('strong')?.textContent;
+      if(!text||example.querySelector('.dy-sentence-audio'))return;
+      const button=document.createElement('button');button.type='button';button.className='dy-sentence-audio';
+      button.innerHTML=dailyIcon('sound')+'播放例句';button.setAttribute('aria-label','播放英语例句');
+      button.onclick=()=>play(text);example.appendChild(button);
+    });
+    if(mode==='colo'&&run.colo&&!run.colo.empty){
+      const button=document.createElement('button');button.type='button';button.className='dy-sentence-audio';
+      button.innerHTML=dailyIcon('sound')+'听完整搭配（提示）';
+      button.onclick=()=>play(run.colo.pair.slice(0,2).join(' '));
+      screen.querySelector('.th-colo-line')?.after(button);
     }
   }
   function recordDailyPresentation(it,ok,p){

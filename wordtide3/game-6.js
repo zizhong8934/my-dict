@@ -45,7 +45,7 @@
     if(!sc?.classList.contains('on')||!input?.matches('#scTheme input,#scTheme textarea'))return;
     const r=input.getBoundingClientRect(),box=sc.getBoundingClientRect();
     const controls=sc.querySelector(".dy-controls");
-    const reserve=document.documentElement.classList.contains("wt-keyboard")&&controls?Math.min(150,controls.getBoundingClientRect().height):0;
+    const reserve=controls?controls.getBoundingClientRect().height:0;
     const top=box.top+12,bottom=box.bottom-reserve-20;
     if(r.top<top)sc.scrollTop+=r.top-top;
     else if(r.bottom>bottom)sc.scrollTop+=r.bottom-bottom;
