@@ -66,7 +66,7 @@
     }
     S.wordStateVersion=VERSION;persist();
   }
-  function refFor(wordId){return catalog().find(x=>x.wordId===wordId)||null}
+  function refFor(wordId){return catalog().find(x=>x.wordId===wordId)||vocabularyRef(wordId)}
   function getState(wordId){const ref=refFor(wordId);if(!ref)return null;return S.wordState[wordId]=normalizeState(S.wordState[wordId],ref)}
   function skillFor(mode){return ({learn:"recognize",recall:"recognize",assemble:"assemble",complete:"complete",spell:"spell",mistakes:"spell",monster:"battle",battle:"battle",echo:"sentence",listen:"listen",sentence:"sentence"})[mode]||"recognize"}
   function nextInterval(days){if(days<1)return 1;if(days<3)return 3;if(days<7)return 7;if(days<14)return 14;if(days<30)return 30;if(days<60)return 60;if(days<120)return 120;return Math.min(240,Math.round(days*1.7))}
@@ -116,6 +116,7 @@
 
   function recordAnswer(evt){
     evt=evt||{};const ref=refFor(evt.wordId);if(!ref)return null;const st=getState(evt.wordId),t=now(),skill=skillFor(evt.mode),correct=!!evt.correct,hints=Math.max(0,evt.hintCount|0),responseMs=Math.max(0,evt.responseMs|0);
+    recordVocabulary(ref,evt,t);
     if(evt.dailyFlow&&correct&&hints)return recordSupportedAnswer(evt,st,t,skill,hints);
     const previousCorrect=st.lastCorrectAt;
     st.seen++;st.lastSeenAt=t;st.hints+=hints;
@@ -220,12 +221,91 @@
     S.dailyHistory.push({id:S.dailySession.id,plan:S.dailySession.plan,startedAt:S.dailySession.startedAt,completedAt:S.dailySession.completedAt,count:S.dailySession.index,ok:result&&result.ok|0,bad:result&&result.bad|0});if(S.dailyHistory.length>60)S.dailyHistory.splice(0,S.dailyHistory.length-60);persist();
   }
 
+  const vocabNorm=w=>String(w||"").normalize("NFKC").toLowerCase().trim().replace(/[‐‑–—-]/g," ").replace(/\s+/g," ");
+  const vocabDay=t=>{const d=new Date(t);return [d.getFullYear(),d.getMonth()+1,d.getDate()].join("-")};
+  const vocabActive=p=>!!(p&&(p.status&&p.status!=="new"||p.introducedAt||p.seen||p.lv||p.ok||p.bad||p.correct||p.wrong||p.learn||p.assemble||p.complete||p.spell));
+  function vocabularyEntries(){
+    const entries=new Map(),known=new Map();
+    for(const ref of catalog()){
+      const w=vocabNorm(ref.item.w);if(!w)continue;
+      if(!known.has(w))known.set(w,ref);
+      const active=vocabActive(S.wordState?.[ref.wordId])||vocabActive(S.themeProg?.[ref.wordId])||vocabActive(originalProgress(ref));
+      if(active)entries.set(w,{w:ref.item.w,zh:ref.item.zh,ref});
+    }
+    function add(item,force,prefix){
+      const w=vocabNorm(item?.w);if(!w||!force&&!vocabActive(S.prog?.[prefix+":"+String(item.w).toLowerCase()]))return;
+      if(entries.has(w))return;
+      const existing=known.get(w);
+      const id="vocab-"+encodeURIComponent(w);
+      const ref=existing||{wordId:"personal:"+id,themeId:"personal",id,item:{id,w:String(item.w).trim(),zh:String(item.zh||"（未填写释义）"),sy:String(item.w).trim(),img:"",ex:[],icon:""},theme:{id:"personal",name:"我的词库"}};
+      entries.set(w,{w:ref.item.w,zh:ref.item.zh,ref});
+    }
+    for(const item of S.custom||[])add(item,true,"g");
+    for(const item of DB.g||[])add(item,false,"g");
+    for(const item of DB.sw||[])add(item,false,"s");
+    return [...entries.values()];
+  }
+  function vocabularyRef(wordId){return vocabularyEntries().find(x=>x.ref.wordId===wordId)?.ref||null}
+  function vocabularyProof(w){
+    S.vocabProof=S.vocabProof&&typeof S.vocabProof==="object"&&!Array.isArray(S.vocabProof)?S.vocabProof:{};
+    const key="w:"+vocabNorm(w);
+    let p=S.vocabProof[key];
+    if(!p||!Array.isArray(p.days)){
+      // The old aggregate spelling count cannot prove two unassisted dates.
+      // Credit at most ONE dated historical success, after its last error.
+      let success=0;
+      const ids=new Set(catalog().filter(x=>vocabNorm(x.item.w)===vocabNorm(w)).map(x=>x.wordId));
+      const events=(S.memoryEvents||[]).filter(e=>ids.has(e.wordId)&&e.mode==="spell"&&e.at>0&&e.at<=now()).sort((a,b)=>a.at-b.at);
+      for(const e of events){if(!e.correct)success=0;else if(!e.hintCount&&e.independent!==false)success=e.at}
+      p=S.vocabProof[key]={days:success?[vocabDay(success)]:[],updatedAt:success,legacy:!!success};
+      persist();
+    }
+    p.days=[...new Set(p.days.filter(x=>typeof x==="string"))].slice(-2);
+    return p;
+  }
+  function recordVocabulary(ref,evt,t){
+    if(evt.mode!=="spell")return;
+    const p=vocabularyProof(ref.item.w);
+    if(!evt.correct){p.days=[];p.updatedAt=t;p.legacy=false;return;}
+    if(!evt.spellingIndependent||evt.hintCount)return;
+    const day=vocabDay(t);
+    if(!p.days.includes(day))p.days.push(day);
+    p.days=p.days.slice(-2);p.updatedAt=t;
+  }
+  function vocabularyStats(){
+    const today=vocabDay(now()),entries=vocabularyEntries().map(x=>{
+      const proof=vocabularyProof(x.w),passed=proof.days.length;
+      return {...x,passed,remaining:Math.max(0,2-passed),eligible:passed<2&&!proof.days.includes(today)};
+    });
+    const total=entries.length,mastered=entries.filter(x=>x.passed>=2).length;
+    return {total,mastered,remaining:total-mastered,checks:entries.reduce((n,x)=>n+x.remaining,0),once:entries.filter(x=>x.passed===1).length,waiting:entries.filter(x=>x.remaining&&!x.eligible).length,eligible:entries.filter(x=>x.eligible).length,entries};
+  }
+  function vocabularyCard(){
+    const v=vocabularyStats();
+    return '<section class="vg-card" aria-labelledby="vgTitle"><div class="vg-heading"><h2 id="vgTitle">这批词还剩多少？</h2><span>'+v.mastered+' / '+v.total+' 已达标</span></div>'
+      +'<p class="vg-remaining"><strong>'+v.remaining+'</strong> 个词待掌握</p>'
+      +'<div class="vg-track" role="progressbar" aria-label="本批词汇掌握目标" aria-valuemin="0" aria-valuemax="'+Math.max(1,v.total)+'" aria-valuenow="'+v.mastered+'"><i style="width:'+(v.total?v.mastered/v.total*100:0)+'%"></i></div>'
+      +'<p>至少还需 <b>'+v.checks+'</b> 次无提示全拼正确'+(v.once?' · '+v.once+' 词已通过一次':'')+'</p>'
+      +'<p class="vg-scope">范围：自己导入的词＋已开始学的词，同词去重。</p>'
+      +'<details><summary>怎样算达标？</summary><p>每个词在不同日期，无提示完整拼写正确 2 次。同日重复不累加；拼错后重新验证。选择、组装和提示拼写不计入。</p><p>旧记录最多折算 1 次。次数是最低验证目标，不保证完成几轮后永久记住；到期仍需复习。</p></details>'
+      +'<p class="vg-next">'+(!v.total?'先导入生词或开始今日学习，这里会自动计入。':!v.remaining?'这批已达标，可以添加下一批新词；已有词仍会安排复习。':v.waiting&&!v.eligible?v.waiting+' 个词今天已验证，换一天再确认。':'先消化这 '+v.remaining+' 个词，再决定下一批导入多少。')+'</p>'
+      +'<button id="vgCheck" class="pl-primary" '+(v.eligible?'':'disabled')+'>'+(!v.total?'尚无待统计的词':v.eligible?'验证剩余词 · 本次最多 10 词':v.remaining?'今天暂无待验证词':'这批已达标')+'</button></section>';
+  }
+  function startVocabularyCheck(){
+    if(sessionUsable()&&!window.confirm("当前还有未完成的练习。开始词汇验证会替换该轮待做题，但不会清除已保存的学习进度。继续吗？"))return false;
+    const list=vocabularyStats().entries.filter(x=>x.eligible).sort((a,b)=>b.passed-a.passed).slice(0,10);
+    if(!list.length){toast("今天没有需要验证的词，换一天再看看");return false}
+    const queue=list.map(x=>({themeId:x.ref.themeId,id:x.ref.item.id,wordId:x.ref.wordId,item:x.ref.themeId==="personal"?x.ref.item:undefined,exercise:"spell",reason:"词汇验证"}));
+    S.dailySession={id:"vocab-"+now(),plan:"verify",queue,index:0,startedAt:now(),updatedAt:now(),completed:false,estimateMinutes:Math.max(1,Math.round(queue.length*.42))};persist();
+    return window.WORDTIDE_THEME.startDaily(queue,{plan:"verify",offset:0});
+  }
+
   function stats(){
     const t=now(),states=catalog().map(x=>getState(x.wordId)),due=states.filter(x=>x.status!=="new"&&x.dueAt<=t).length,stable=states.filter(x=>x.status==="stable").length,learning=states.filter(x=>x.status==="learning"||x.status==="review").length,fresh=states.filter(x=>x.status==="new").length,weak=states.filter(x=>x.lapses>=2).length;
     const recent=S.memoryEvents.filter(x=>x.at>=t-7*DAY),delayed=recent.filter(x=>x.mode==="spell"||x.mode==="battle"),unhinted=delayed.filter(x=>x.correct&&!x.hintCount).length;
     return {total:states.length,due,stable,learning,fresh,weak,unhintedRate:delayed.length?Math.round(unhinted/delayed.length*100):0};
   }
-  function labelPlan(p){return p==="standard"?"标准计划":p==="review"?"只复习":"快速计划"}
+  function labelPlan(p){return p==="verify"?"词汇验证":p==="standard"?"标准计划":p==="review"?"只复习":"快速计划"}
   function planIcon(name){
     const paths={back:'m14 5-7 7 7 7',sound:'M11 4 6 8H3v8h3l5 4V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14',bolt:'m14 2-9 12h6l-1 8 9-12h-6l1-8',wave:'M2 9c4-6 6 6 10 0s6 6 10 0M2 16c4-6 6 6 10 0s6 6 10 0',again:'M20 7v5h-5M20 12a8 8 0 1 0-2 6',moon:'M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z',sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 1v3m0 16v3M1 12h3m16 0h3'};
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+paths[name]+'"/></svg>';
@@ -237,6 +317,7 @@
     screen.innerHTML='<div class="pl-shell"><header class="pl-header"><button id="p3Back" class="pl-round" aria-label="返回首页">'+planIcon('back')+'</button><div class="pl-title"><h1>今日潮汐</h1><p>复习一点，也认识新词</p></div><button id="plAudio" class="pl-round" aria-label="声音设置">'+planIcon('sound')+'</button><button id="plTone" class="pl-round" aria-label="'+(tone==='dark'?'切换浅色模式':'切换深色模式')+'">'+planIcon(tone==='dark'?'sun':'moon')+'</button></header>'
       +'<section class="pl-hero"><div class="pl-hero-copy"><span class="pl-eyebrow">今天的学习</span><h2><strong>'+s.due+'</strong> 个词到期</h2><p>'+(s.due?'先温习旧词，让记忆更牢固。':'没有到期词，按自己的节奏来。')+'</p></div>'
       +(resume?'<div class="pl-resume"><div><b>接着上次继续</b><span>'+labelPlan(resume.plan)+' · 停在第 '+(resume.index+1)+' / '+resume.queue.length+' 题</span></div><div class="pl-progress" role="progressbar" aria-label="上次学习进度" aria-valuemin="0" aria-valuemax="'+resume.queue.length+'" aria-valuenow="'+resume.index+'"><i style="width:'+Math.round(resume.index/resume.queue.length*100)+'%"></i></div><button class="pl-primary" id="p3Resume">继续上次学习 <span aria-hidden="true">→</span></button></div>':'<div class="pl-hero-note">新词与复习穿插出现，不用从头重来。</div>')+'</section>'
+      +vocabularyCard()
       +'<div class="pl-stats" aria-label="学习概况">'+[['薄弱词',s.weak],['正在巩固',s.learning],['稳定记忆',s.stable]].map(([label,n])=>'<div><b>'+n+'</b><span>'+label+'</span></div>').join('')+'</div>'
       +'<section class="pl-plans"><div class="pl-section-head"><h2>'+(resume?'也可以开始新一轮':'选一轮，开始学习')+'</h2><span>自动安排题型</span></div>'
       +planCard(quick,'快速学习','bolt','先认识，再遮住答案回忆；初始最多 12 步，回练最多加 4 步。')
@@ -245,6 +326,7 @@
       +'<details class="pl-more"><summary>实战与学习说明</summary><section class="pl-battle"><h2>今日塔防</h2><p>'+(battle.length?'用 '+battle.length+' 个学过的词进行实战练习。':'完成一些单词学习后，即可进入今日塔防。')+'</p><button id="p3Battle" '+(battle.length?'':'disabled')+'>进入今日塔防</button></section><section class="pl-explain"><h2>为什么出现这些词？</h2><p>到期复习：按记忆情况安排温习。<br>薄弱词：最近答错过，需要多练一次。<br>新词：复习量允许时，少量穿插加入。</p><p>当天答对是开始，跨天独立回忆才会逐步成为稳定记忆。</p></section></details>'
       +'<p class="pl-footer">学习记录保存在当前浏览器</p></div>';
     document.getElementById('p3Back').onclick=()=>{showScreen('scHome');try{refreshHome()}catch(e){}};
+    document.getElementById('vgCheck').onclick=startVocabularyCheck;
     document.getElementById('plAudio').onclick=()=>document.getElementById('wtAudioButton')?.click();
     document.getElementById('plTone').onclick=()=>{if(window.OCEAN_HOME)OCEAN_HOME.toggle();else{S.themeAppearance=tone==='dark'?'light':'dark';persist()}renderDaily()};
     screen.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>startPlan(b.dataset.plan));
@@ -266,6 +348,6 @@
   ensure();screen=document.createElement("div");screen.className="screen";screen.id="scDaily";document.body.appendChild(screen);addHomeCard();
   const oldRefresh=window.refreshHome||null;if(oldRefresh)window.refreshHome=function(){oldRefresh();if(!S.wordState||!Array.isArray(S.memoryEvents))ensure();updateHome()};
   window.addEventListener("wordtide-memory-updated",updateHome);
-  window.WORDTIDE_MEMORY={version:VERSION,catalog,stats,getState,recordExposure,recordAnswer,recordTheme,recordOriginal,buildDailyQueue,buildBattleQueue,startPlan,startBattle,consumeBattleQueue,resumeSession,updateSession,completeSession,openDaily,renderDaily};
+  window.WORDTIDE_MEMORY={version:VERSION,catalog,stats,getState,recordExposure,vocabularyStats,startVocabularyCheck,recordAnswer,recordTheme,recordOriginal,buildDailyQueue,buildBattleQueue,startPlan,startBattle,consumeBattleQueue,resumeSession,updateSession,completeSession,openDaily,renderDaily};
 })();
 

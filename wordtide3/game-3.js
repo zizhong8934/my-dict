@@ -36,7 +36,7 @@
   function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
   function sea(){return SEAS.find(x=>x.id===seaId)||SEAS[0]}
   function itemSeaId(it){return it&&it._seaId||seaId}
-  function seaFor(it){return SEAS.find(x=>x.id===itemSeaId(it))||sea()}
+  function seaFor(it){if(itemSeaId(it)==="personal")return {id:"personal",name:"我的词库",items:[],full:true};return SEAS.find(x=>x.id===itemSeaId(it))||sea()}
   function key(it){return itemSeaId(it)+":"+it.id}
   let originalWordIndex=null;
   function originalKey(it){
@@ -73,6 +73,8 @@
   function mastered(it){return score(it)>=7}
   function mistakeCount(it){return S.themeMistakes[key(it)]|0}
   function mark(it,type,ok,meta){
+    const pos=(run?.dailyOffset|0)+(run?.i|0);
+    if(type==="spell"){meta={...meta};if(run?.vocabHelpAt===pos)meta.hintCount=Math.max(1,meta.hintCount||0);if(!ok&&run)run.vocabHelpAt=pos;}
     const p=prog(it);if(run?.daily&&ok&&(flowAssisted()||meta?.hintCount)){flowSupported(it,type,meta,p);return;}
     if(run?.daily)recordDailyPresentation(it,ok,p); p.last=Date.now();
     /* 结算页要列出"这几个再看一眼"，所以本轮错过的词要留下来（去重）。
@@ -88,7 +90,7 @@
     else{p.bad=(p.bad|0)+1;S.themeMistakes[key(it)]=mistakeCount(it)+1;}
     syncToOriginal(it,p);
     S.themeStats.answers=(S.themeStats.answers|0)+1;if(ok)S.themeStats.correct=(S.themeStats.correct|0)+1;save();
-    try{if(window.WORDTIDE_MEMORY)window.WORDTIDE_MEMORY.recordTheme({wordId:key(it),themeId:itemSeaId(it),item:it,mode:type,correct:!!ok,dailyFlow:!!run?.daily,hintCount:meta&&meta.hintCount||0,responseMs:run&&run.qStartedAt?Date.now()-run.qStartedAt:0})}catch(e){console.warn("统一记忆记录失败",e)}
+    try{if(window.WORDTIDE_MEMORY)window.WORDTIDE_MEMORY.recordTheme({wordId:key(it),themeId:itemSeaId(it),item:it,mode:type,correct:!!ok,dailyFlow:!!run?.daily,spellingIndependent:type==="spell"&&!(meta?.hintCount)&&!(run?.daily&&flowAssisted()),hintCount:meta&&meta.hintCount||0,responseMs:run&&run.qStartedAt?Date.now()-run.qStartedAt:0})}catch(e){console.warn("统一记忆记录失败",e)}
   }
   function overall(){const all=SEAS.flatMap(x=>x.items.map(i=>[x.id,i]));let done=0;for(const [sid,it] of all){const old=seaId;seaId=sid;if(mastered(it))done++;seaId=old;}return {done,total:all.length}}
   function toolProgress(){const old=seaId;seaId="tools";const done=CORE_TOOLS.filter(mastered).length;seaId=old;return done}
@@ -149,7 +151,7 @@
     if(mode==="monster")renderMonster();else if(mode==="echo")renderEcho();else renderLesson();
   }
   function startDaily(refs,opts){
-    opts=opts||{};const queue=(refs||[]).map(ref=>{const s=SEAS.find(x=>x.id===ref.themeId),it=s&&s.items.find(x=>x.id===ref.id);return it?Object.assign({},it,{_seaId:ref.themeId,_exercise:ref.exercise||"spell",_reason:ref.reason||"今日计划"}):null}).filter(Boolean);
+    opts=opts||{};const queue=(refs||[]).map(ref=>{const s=SEAS.find(x=>x.id===ref.themeId),it=s?s.items.find(x=>x.id===ref.id):ref.themeId==="personal"&&ref.item&&typeof ref.item.w==="string"?{img:"",ex:[],colo:[],chunks:[],...ref.item,id:ref.id,imageNeedsReview:true}:null;return it?Object.assign({},it,{_seaId:ref.themeId,_exercise:ref.exercise||"spell",_reason:ref.reason||"今日计划"}):null}).filter(Boolean);
     if(!queue.length){toast("今天暂时没有可学习的词");return false}
     run={mode:"daily",phase:null,items:queue.slice(),queue:queue.slice(),i:0,ok:0,bad:0,t0:Date.now(),missed:[],lvUps:0,hp:100,def:3,requeued:{},rate:S.themeEchoRate||.78,build:null,mask:null,daily:true,dailyPlan:opts.plan||"quick",dailyOffset:opts.offset|0};
     const resuming=opts.resume||opts.offset>0;
@@ -600,6 +602,7 @@
     const feedback=document.getElementById('thFeedback');if(feedback){feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');}
     if(run.daily){dailyLayout(it,mode);flowWire(it,mode);}
     wireFirstLook(it);
+    if(isSpell)document.getElementById("thHear")?.addEventListener("click",()=>{if(!run.locked)run.vocabHelpAt=(run.dailyOffset|0)+run.i},true);
     const hear=document.getElementById('thHear');if(hear)hear.onclick=()=>{if(run.daily){speakAt(it.w,.78);return;}const sentence=it.ex?.[0]?.[0]||it.w;if(window.WT_AUDIO)WT_AUDIO.sequence([it.w,sentence],.78);else speakAt(it.w,.72)};
     if(isPick||isZh){
       document.getElementById("thPickGrid").querySelectorAll("[data-pick]").forEach(b=>{
@@ -679,7 +682,7 @@
     run.helpPosition=flowPosition();
     const s=S.dailySession;if(s){s.learningHelp=s.learningHelp||{};s.learningHelp[flowPosition()]=true;save()}
   }
-  function flowRef(it){return {themeId:itemSeaId(it),id:it.id,wordId:key(it),exercise:it._exercise,reason:it._reason}}
+  function flowRef(it){return {themeId:itemSeaId(it),id:it.id,wordId:key(it),exercise:it._exercise,reason:it._reason,...(itemSeaId(it)==="personal"?{item:{id:it.id,w:it.w,zh:it.zh,sy:it.sy,img:"",ex:[]}}:{})}}
   function flowSaveQueue(){
     const s=S.dailySession;if(!s||s.completed||!Array.isArray(s.queue))return;
     s.queue=s.queue.slice(0,run.dailyOffset|0).concat(run.queue.map(flowRef));save();
@@ -797,13 +800,13 @@
   function dailyShell(title,body){
     dailyTone();
     const total=(run.dailyOffset|0)+run.queue.length,index=(run.dailyOffset|0)+run.i,plan=run.dailyPlan;
-    const name=plan==='standard'?'标准学习':plan==='review'?'专注复习':'快速学习';
+    const name=plan==='verify'?'词汇验证':plan==='standard'?'标准学习':plan==='review'?'专注复习':'快速学习';
     const minutes=Math.max(1,Math.round(total*.42)),kind=dailyKind(current());
     const counts={review:0,consolidate:0,new:0};
     for(const it of run.items){const k=dailyKind(it);counts[k==='weak'?'review':k]++;}
     screen.innerHTML='<div class="dy-shell"><header class="dy-header"><button id="thExit" class="dy-back" aria-label="返回今日计划">'+dailyIcon('back')+'</button><div class="dy-heading"><h1><span>'+dailyIcon(plan==='quick'?'bolt':'wave')+'</span>'+name+'</h1><p>'+total+' 步 · 约 '+minutes+' 分钟</p></div><div class="dy-counter"><b>'+Math.min(index+1,total)+'</b> / '+total+'</div></header>'
       +'<div class="dy-progress" role="progressbar" aria-label="本轮学习进度" aria-valuemin="0" aria-valuemax="'+total+'" aria-valuenow="'+index+'"><i style="width:'+Math.min(100,index/Math.max(1,total)*100)+'%"></i></div>'
-      +(plan!=='quick'?'<div class="dy-mix" aria-label="新旧词交错练习">'+[['review','复习'],['consolidate','巩固'],['new','新词']].map(([k,n])=>'<span class="'+((kind==='weak'?'review':kind)===k?'active':'')+'">'+n+' <b>'+counts[k]+'</b></span>').join('')+'</div>':'')
+      +(!['quick','verify'].includes(plan)?'<div class="dy-mix" aria-label="新旧词交错练习">'+[['review','复习'],['consolidate','巩固'],['new','新词']].map(([k,n])=>'<span class="'+((kind==='weak'?'review':kind)===k?'active':'')+'">'+n+' <b>'+counts[k]+'</b></span>').join('')+'</div>':'')
       +'<section class="th-panel th-lesson on dy-card">'+dailyMeta(current())+body+'</section><div class="dy-controls" id="dyControls"></div><div class="dy-foot"><span>'+esc(title)+' · '+esc(seaFor(current()).name)+'</span><button id="dyAudio">声音设置</button></div></div>';
     document.getElementById('thExit').onclick=()=>window.WORDTIDE_MEMORY.openDaily();
     document.getElementById('dyAudio').onclick=()=>document.getElementById('wtAudioButton')?.click();
@@ -900,7 +903,7 @@
     const newIds=new Set([...(S.dailySession?.introduced||[]),...results.filter(x=>x.wasNew).map(x=>x.themeId+':'+x.id)]);
     const newCount=newIds.size;
     const elapsed=Date.now()-(S.dailySession?.startedAt||run.t0||Date.now());
-    const missed=results.filter(x=>!x.firstCorrect).map(x=>{const it=SEAS.find(s=>s.id===x.themeId)?.items.find(it=>it.id===x.id);return it?{...it,_seaId:x.themeId}:null}).filter(Boolean).filter((it,i,a)=>a.findIndex(x=>key(x)===key(it))===i);
+    const missed=results.filter(x=>!x.firstCorrect).map(x=>{const it=SEAS.find(s=>s.id===x.themeId)?.items.find(it=>it.id===x.id)||run.items.find(it=>itemSeaId(it)===x.themeId&&it.id===x.id);return it?{...it,_seaId:x.themeId}:null}).filter(Boolean).filter((it,i,a)=>a.findIndex(x=>key(x)===key(it))===i);
     if(window.WORDTIDE_MEMORY&&!run.summarySaved){window.WORDTIDE_MEMORY.completeSession({ok:run.ok,bad:run.bad,firstCorrect:right,completedQuestions:done,newRecognized:newCount});run.summarySaved=true;}
     const R=52,C=2*Math.PI*R,off=C*(1-right/Math.max(1,done));
     screen.innerHTML='<div class="dy-shell dy-finished"><header class="dy-header"><button class="dy-back" id="thDailyBack" aria-label="返回今日计划">'+dailyIcon('back')+'</button><div class="dy-heading"><h1>本次练习完成</h1><p>本轮记录已保存</p></div></header><section class="th-summary">'
@@ -914,7 +917,7 @@
     const plan=run.dailyPlan;
     document.getElementById('thDailyBack').onclick=()=>window.WORDTIDE_MEMORY.openDaily();
     document.getElementById('thDailyHome').onclick=()=>window.WORDTIDE_MEMORY.openDaily();
-    document.getElementById('thDailyAgain').onclick=()=>window.WORDTIDE_MEMORY.startPlan(plan);
+    document.getElementById('thDailyAgain').onclick=()=>plan==="verify"?window.WORDTIDE_MEMORY.startVocabularyCheck():window.WORDTIDE_MEMORY.startPlan(plan);
     document.getElementById('dyThemeHub').onclick=openHub;
     missed.forEach((it,i)=>document.getElementById('dyRedo'+i).onclick=()=>{seaId=it._seaId;start('adaptive',it)});
     updateHome();

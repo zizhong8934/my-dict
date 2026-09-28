@@ -24,10 +24,46 @@
   document.addEventListener('visibilitychange',()=>{if(document.hidden){stop();window.WT_AUDIO?.stop();flush()}else sync()});window.addEventListener('pagehide',()=>{stop();flush()});
   const oldShow=window.showScreen;window.showScreen=function(id){const result=oldShow.apply(this,arguments);sync();return result};
   const oldBgm=window.startBgm;window.startBgm=function(){stop();return oldBgm.apply(this,arguments)};
-  function fit(){document.documentElement.style.setProperty('--wt-visible-height',(window.visualViewport?.height||window.innerHeight)+'px')}
-  window.visualViewport?.addEventListener('resize',fit);window.addEventListener('resize',fit);fit();
+  // The visual viewport moves as well as shrinks on iOS. Never scroll the body
+  // to reveal a fixed-screen input: scroll only the lesson's own container.
+  let viewportFrame=0,focusTimer=0;
+  function fit(){
+    if(viewportFrame)return;
+    viewportFrame=requestAnimationFrame(()=>{
+      viewportFrame=0;
+      const v=window.visualViewport,root=document.documentElement;
+      const height=v?.height||innerHeight,top=Math.max(0,v?.offsetTop||0);
+      root.style.setProperty('--wt-visible-height',height+'px');
+      root.style.setProperty('--wt-visual-top',top+'px');
+      const focused=document.activeElement?.matches('#scTheme input,#scTheme textarea');
+      root.classList.toggle('wt-keyboard',!!focused&&innerHeight-height>100);
+      if(focused)keepAnswerVisible();
+    });
+  }
+  function keepAnswerVisible(){
+    const input=document.activeElement,sc=document.getElementById('scTheme');
+    if(!sc?.classList.contains('on')||!input?.matches('#scTheme input,#scTheme textarea'))return;
+    const r=input.getBoundingClientRect(),box=sc.getBoundingClientRect();
+    const controls=sc.querySelector(".dy-controls");
+    const reserve=document.documentElement.classList.contains("wt-keyboard")&&controls?Math.min(150,controls.getBoundingClientRect().height):0;
+    const top=box.top+12,bottom=box.bottom-reserve-20;
+    if(r.top<top)sc.scrollTop+=r.top-top;
+    else if(r.bottom>bottom)sc.scrollTop+=r.bottom-bottom;
+  }
+  window.visualViewport?.addEventListener('resize',fit);
+  window.visualViewport?.addEventListener('scroll',fit);
+  window.addEventListener('resize',fit);
+  window.addEventListener('orientationchange',fit);
+  document.addEventListener('focusin',e=>{
+    if(!e.target.matches('#scTheme input,#scTheme textarea'))return;
+    clearTimeout(focusTimer);fit();
+    focusTimer=setTimeout(()=>{fit();keepAnswerVisible()},350);
+  });
+  document.addEventListener('focusout',()=>{clearTimeout(focusTimer);fit();focusTimer=setTimeout(fit,350)});
+  fit();
+
   function prepare(){document.querySelectorAll('#scTheme input[type=text],#scTheme input:not([type]),#scTheme textarea').forEach(e=>{e.setAttribute('autocapitalize','none');e.setAttribute('autocorrect','off');e.setAttribute('spellcheck','false');e.setAttribute('enterkeyhint','done');if(!e.getAttribute('aria-label'))e.setAttribute('aria-label','输入英文答案')});document.querySelectorAll('#thPickGrid button').forEach((b,i)=>b.setAttribute('aria-label','图片选项 '+(i+1)))}
   const theme=document.getElementById('scTheme');if(theme){if(typeof MutationObserver!=='undefined')new MutationObserver(prepare).observe(theme,{childList:true,subtree:true});prepare()}
-  document.addEventListener('focusin',e=>{if(e.target.matches('#scTheme input,#scTheme textarea'))setTimeout(()=>{if(document.activeElement===e.target)e.target.scrollIntoView({block:'center',behavior:'smooth'})},250)});
+
 })();
 

@@ -1386,6 +1386,33 @@ body:has(#scDaily.on) #cv,body.ox-home-visible #cv{visibility:hidden}
 #scDaily .pl-explain{padding-top:18px}
 #scDaily .pl-footer{font-size:13px;text-align:center;color:var(--pl-muted)}
 @media(max-width:360px){#scDaily{padding-left:12px!important;padding-right:12px!important}#scDaily .pl-header{gap:7px}#scDaily .pl-title h1{font-size:22px}#scDaily .pl-title p{font-size:12px}#scDaily .pl-plan{padding:15px}#scDaily .pl-section-head{flex-wrap:wrap}}
+
+/* Hide the legacy canvas across the entire keyboard gap, not just the card. */
+body:has(#scTheme.on) #cv{visibility:hidden!important}
+body:has(#scTheme.dy-active.on){background:var(--app-bg)!important}
+html:has(#scTheme.dy-active.on[data-tone=dark]),html:has(#scDaily.on[data-tone=dark]){--app-bg:#061722}
+html:has(#scTheme.dy-active.on[data-tone=light]),html:has(#scDaily.on[data-tone=light]){--app-bg:#f3f9ff}
+#scTheme.dy-active,#scDaily{top:var(--wt-visual-top,0px)!important;bottom:auto!important;height:var(--wt-visible-height,100dvh)!important;max-height:none!important;box-sizing:border-box;overflow-y:auto;overflow-anchor:none}
+html.wt-keyboard #scTheme.dy-active{padding-top:12px;padding-bottom:16px}
+html.wt-keyboard #scTheme .dy-controls{position:sticky;bottom:0;z-index:12;padding:8px 0;background:var(--paper);border-top:1px solid var(--line)}
+html.wt-keyboard #scTheme .dy-controls>.th-tip{display:none}
+html.wt-keyboard #scTheme .dy-controls .th-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+html.wt-keyboard #scTheme .dy-controls .th-actions:has(#thCompleteHint){grid-template-columns:1fr 1fr 1.4fr}
+html.wt-keyboard #scTheme .dy-controls .th-main{grid-column:auto;min-height:46px;font-size:16px}
+html.wt-keyboard #scTheme .dy-controls .th-actions button{min-height:46px;padding:9px 6px}
+html.wt-keyboard #scTheme .dy-controls svg{width:20px;height:20px;margin-right:4px}
+#scDaily .vg-card{padding:20px;border:1px solid var(--pl-line);border-radius:20px;background:var(--pl-card)}
+#scDaily .vg-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#scDaily .vg-heading span{font-size:14px;color:var(--pl-muted)}
+#scDaily .vg-remaining{font-size:18px;margin:12px 0 8px}
+#scDaily .vg-remaining strong{font-size:36px;line-height:1.2;margin-right:4px}
+#scDaily .vg-card p{font-size:14px;line-height:1.6;margin-top:10px}
+#scDaily .vg-card .vg-scope{color:var(--pl-muted)}
+#scDaily .vg-track{height:8px;background:var(--pl-soft);border-radius:999px;overflow:hidden}
+#scDaily .vg-track i{display:block;height:100%;background:#087fff;border-radius:inherit}
+#scDaily .vg-card details{margin:12px 0;color:var(--pl-muted);font-size:14px}
+#scDaily .vg-card summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+#scDaily .vg-card button{margin-top:16px}
 </style><link rel="icon" type="image/png" sizes="32x32" href="./wordtide-icon-32.png?v=20260922"><link rel="apple-touch-icon" sizes="180x180" href="./wordtide-icon-180.png?v=20260922"><link rel="manifest" href="./manifest.webmanifest?v=20260922"><style id="wt-unified-brand">
  #topbar #brand.wt-unified{display:flex;align-items:center;gap:7px;background:none;filter:none;color:#123d65;letter-spacing:0;max-width:none;flex-shrink:0}
  #topbar #brand .wt-brand-mark{display:block;width:34px;height:34px;max-width:none;flex-shrink:0;object-fit:contain}
@@ -1709,9 +1736,9 @@ body:has(#scDaily.on) #cv,body.ox-home-visible #cv{visibility:hidden}
 <script src="./game-0.js?v=a9e330a96a"></script>
 <script src="./game-1.js?v=fb26a6da67"></script>
 <script src="./game-2.js?v=786b2c75b3"></script>
-<script src="./game-3.js?v=8e3bb9fd4c"></script>
-<script src="./game-4.js?v=e2ebacf55f"></script>
+<script src="./game-3.js?v=f976abcdf6"></script>
+<script src="./game-4.js?v=488ba351b6"></script>
 <script src="./game-5.js?v=ffa284150a"></script>
-<script src="./game-6.js?v=ad9df66765"></script>
+<script src="./game-6.js?v=2b4ef745a7"></script>
 <script src="./game-7.js?v=cb9643a8b6"></script></body>
 </html>
