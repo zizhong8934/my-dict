@@ -282,7 +282,7 @@
   }
   function vocabularyCard(){
     const v=vocabularyStats();
-    return '<section class="vg-card" aria-labelledby="vgTitle"><div class="vg-heading"><h2 id="vgTitle">这批词还剩多少？</h2><span>'+v.mastered+' / '+v.total+' 已达标</span></div>'
+    return importedVocabularyCard(v)+'<section class="vg-card" aria-labelledby="vgTitle"><div class="vg-heading"><h2 id="vgTitle">这批词还剩多少？</h2><span>'+v.mastered+' / '+v.total+' 已达标</span></div>'
       +'<p class="vg-remaining"><strong>'+v.remaining+'</strong> 个词待掌握</p>'
       +'<div class="vg-track" role="progressbar" aria-label="本批词汇掌握目标" aria-valuemin="0" aria-valuemax="'+Math.max(1,v.total)+'" aria-valuenow="'+v.mastered+'"><i style="width:'+(v.total?v.mastered/v.total*100:0)+'%"></i></div>'
       +'<p>至少还需 <b>'+v.checks+'</b> 次无提示全拼正确'+(v.once?' · '+v.once+' 词已通过一次':'')+'</p>'
@@ -290,6 +290,21 @@
       +'<details><summary>怎样算达标？</summary><p>每个词在不同日期，无提示完整拼写正确 2 次。同日重复不累加；拼错后重新验证。选择、组装和提示拼写不计入。</p><p>旧记录最多折算 1 次。次数是最低验证目标，不保证完成几轮后永久记住；到期仍需复习。</p></details>'
       +'<p class="vg-next">'+(!v.total?'先导入生词或开始今日学习，这里会自动计入。':!v.remaining?'这批已达标，可以添加下一批新词；已有词仍会安排复习。':v.waiting&&!v.eligible?v.waiting+' 个词今天已验证，换一天再确认。':'先消化这 '+v.remaining+' 个词，再决定下一批导入多少。')+'</p>'
       +'<button id="vgCheck" class="pl-primary" '+(v.eligible?'':'disabled')+'>'+(!v.total?'尚无待统计的词':v.eligible?'验证剩余词 · 本次最多 10 词':v.remaining?'今天暂无待验证词':'这批已达标')+'</button></section>';
+  }
+  function importedVocabularyStats(all){
+    const imported=new Set((S.custom||[]).map(x=>vocabNorm(x?.w)).filter(Boolean));
+    const entries=(all||vocabularyStats()).entries.filter(x=>imported.has(vocabNorm(x.w)));
+    const total=entries.length,mastered=entries.filter(x=>x.passed>=2).length;
+    return {total,mastered,remaining:total-mastered,percent:total?Math.round(mastered/total*100):0};
+  }
+  function importedVocabularyCard(all){
+    const v=importedVocabularyStats(all);
+    return '<section class="vg-card vi-card" aria-labelledby="viTitle"><div class="vg-heading"><h2 id="viTitle">导入词汇总览</h2><span>只统计自己导入的词</span></div>'
+      +'<div class="vi-counts"><div><strong id="viTotal">'+v.total+'</strong><span>导入总数</span></div><div><strong id="viMastered">'+v.mastered+'</strong><span>已记住</span></div><div><strong id="viRemaining">'+v.remaining+'</strong><span>待掌握</span></div></div>'
+      +'<div class="vi-progress-label"><span>'+v.mastered+' / '+v.total+' 个词已记住</span><b>'+v.percent+'%</b></div>'
+      +'<div class="vg-track" role="progressbar" aria-label="导入词汇掌握比例" aria-valuemin="0" aria-valuemax="'+Math.max(1,v.total)+'" aria-valuenow="'+v.mastered+'" aria-valuetext="'+(v.total?v.mastered+' / '+v.total+' 个词已记住':'尚未导入词汇')+'"><i style="width:'+(v.total?v.mastered/v.total*100:0)+'%"></i></div>'
+      +(!v.total?'<p class="vg-scope">还没有导入词汇；导入后会自动显示进度。</p>':'')
+      +'<details><summary>统计口径</summary><p>只统计当前导入词库，同词去重，不把额外的内置词算入总数。已记住沿用现有标准：不同日期无提示完整拼写正确 2 次；拼错后重新巩固。学过或选择题答对不直接算记住。</p></details></section>';
   }
   function startVocabularyCheck(){
     if(sessionUsable()&&!window.confirm("当前还有未完成的练习。开始词汇验证会替换该轮待做题，但不会清除已保存的学习进度。继续吗？"))return false;
@@ -348,6 +363,6 @@
   ensure();screen=document.createElement("div");screen.className="screen";screen.id="scDaily";document.body.appendChild(screen);addHomeCard();
   const oldRefresh=window.refreshHome||null;if(oldRefresh)window.refreshHome=function(){oldRefresh();if(!S.wordState||!Array.isArray(S.memoryEvents))ensure();updateHome()};
   window.addEventListener("wordtide-memory-updated",updateHome);
-  window.WORDTIDE_MEMORY={version:VERSION,catalog,stats,getState,recordExposure,vocabularyStats,startVocabularyCheck,recordAnswer,recordTheme,recordOriginal,buildDailyQueue,buildBattleQueue,startPlan,startBattle,consumeBattleQueue,resumeSession,updateSession,completeSession,openDaily,renderDaily};
+  window.WORDTIDE_MEMORY={version:VERSION,catalog,stats,getState,recordExposure,vocabularyStats,importedVocabularyStats,startVocabularyCheck,recordAnswer,recordTheme,recordOriginal,buildDailyQueue,buildBattleQueue,startPlan,startBattle,consumeBattleQueue,resumeSession,updateSession,completeSession,openDaily,renderDaily};
 })();
 

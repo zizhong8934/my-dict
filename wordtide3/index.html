@@ -1413,6 +1413,14 @@ html.wt-keyboard #scTheme .dy-controls svg{width:20px;height:20px;margin-right:4
 #scDaily .vg-card details{margin:12px 0;color:var(--pl-muted);font-size:14px}
 #scDaily .vg-card summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
 #scDaily .vg-card button{margin-top:16px}
+#scDaily .vi-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:18px 0}
+#scDaily .vi-counts>div{min-width:0;text-align:center;padding:12px 4px;background:var(--pl-soft);border-radius:12px}
+#scDaily .vi-counts strong{display:block;font-size:clamp(24px,7vw,32px);line-height:1.25;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+#scDaily .vi-counts span{display:block;margin-top:6px;font-size:14px;color:var(--pl-muted)}
+#scDaily .vi-counts>div:nth-child(2) strong{color:#0967cc}
+#scDaily[data-tone=dark] .vi-counts>div:nth-child(2) strong{color:#76cfff}
+#scDaily .vi-progress-label{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:14px;color:var(--pl-muted)}
+#scDaily .vi-card details{margin-bottom:0}
 
 /* Keep real controls visible; lesson text and explanations remain scrollable. */
 #scTheme.dy-active:not([data-exercise=summary]) .dy-shell{gap:12px;padding-bottom:calc(150px + env(safe-area-inset-bottom))}
@@ -1764,7 +1772,7 @@ html.wt-keyboard #scTheme.dy-active .dy-controls .th-main{grid-column:auto}
 <script src="./game-1.js?v=fb26a6da67"></script>
 <script src="./game-2.js?v=786b2c75b3"></script>
 <script src="./game-3.js?v=27badfe7e7"></script>
-<script src="./game-4.js?v=488ba351b6"></script>
+<script src="./game-4.js?v=bcca00b629"></script>
 <script src="./game-5.js?v=ffa284150a"></script>
 <script src="./game-6.js?v=129639c0c6"></script>
 <script src="./game-7.js?v=cb9643a8b6"></script></body>
