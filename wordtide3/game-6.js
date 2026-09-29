@@ -35,20 +35,21 @@
       const height=v?.height||innerHeight,top=Math.max(0,v?.offsetTop||0);
       root.style.setProperty('--wt-visible-height',height+'px');
       root.style.setProperty('--wt-visual-top',top+'px');
-      const focused=document.activeElement?.matches('#scTheme input,#scTheme textarea');
+      const focused=document.activeElement?.matches('#scTheme input:not([readonly]),#scTheme textarea:not([readonly])');
       root.classList.toggle('wt-keyboard',!!focused&&innerHeight-height>100);
       if(focused)keepAnswerVisible();
     });
   }
   function keepAnswerVisible(){
     const input=document.activeElement,sc=document.getElementById('scTheme');
-    if(!sc?.classList.contains('on')||!input?.matches('#scTheme input,#scTheme textarea'))return;
-    const r=input.getBoundingClientRect(),box=sc.getBoundingClientRect();
+    if(!sc?.classList.contains('on')||!input?.matches('#scTheme input:not([readonly]),#scTheme textarea:not([readonly])'))return;
+    const scroll=sc.querySelector('.dy-scroll')||sc;
+    const r=input.getBoundingClientRect(),box=scroll.getBoundingClientRect();
     const controls=sc.querySelector(".dy-controls");
-    const reserve=controls?controls.getBoundingClientRect().height:0;
-    const top=box.top+12,bottom=box.bottom-reserve-20;
-    if(r.top<top)sc.scrollTop+=r.top-top;
-    else if(r.bottom>bottom)sc.scrollTop+=r.bottom-bottom;
+    const reserve=scroll===sc&&controls?controls.getBoundingClientRect().height:0;
+    const top=box.top+12,bottom=box.bottom-reserve-12;
+    if(r.top<top)scroll.scrollTop+=r.top-top;
+    else if(r.bottom>bottom)scroll.scrollTop+=r.bottom-bottom;
   }
   window.visualViewport?.addEventListener('resize',fit);
   window.visualViewport?.addEventListener('scroll',fit);

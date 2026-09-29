@@ -171,13 +171,16 @@
     if(btn){btn.id='thGoOnBtn';btn.textContent='继续 →';btn.classList.add('th-main');}
     else if(bar){bar.innerHTML='<button class="th-main th-goon-btn" id="thGoOnBtn">继续 →</button>';btn=document.getElementById('thGoOnBtn');}
     if(!btn)return;
+    btn.disabled=false;btn.type='button';
     screen.querySelectorAll('input').forEach(x=>{x.readOnly=true;x.blur()});
     const hint=document.getElementById('thCompleteHint');if(hint)hint.disabled=true;
     btn.onclick=()=>{
       if(run!==active||run.i!==index||run.phase!==phase||!active.locked)return;
       active.locked=false;advanceLesson();
     };
-    requestAnimationFrame(()=>{if(run===active&&active.locked&&btn.isConnected)btn.scrollIntoView({block:'nearest'});});
+    // Daily controls stay visible in their scroll container; never move the
+    // outer iOS viewport while the keyboard is closing.
+    if(!run.daily)requestAnimationFrame(()=>{if(run===active&&active.locked&&btn.isConnected)btn.scrollIntoView({block:'nearest'});});
   }
   function answerKey(e,check){
     if(e.key!=='Enter'||e.isComposing||e.repeat)return;
@@ -744,7 +747,7 @@
     const controls=document.getElementById("dyControls");
     const note=document.createElement("p");note.className="th-tip";note.id="flowHelpNote";note.setAttribute("role","status");
     const update=()=>{note.textContent=flowAssisted()?"已使用提示：本题算辅助练习，不算独立记住。":"先自己回忆；需要时可以用提示，不会扣分。"};
-    update();controls?.before(note);
+    update();screen.querySelector('.dy-scroll')?.insertBefore(note,screen.querySelector('.dy-foot'));
     const exposesAudio=["zhpick","spell","complete","assemble","sentence","colo","recall"].includes(mode);
     for(const id of ["dyHint","thCompleteHint",...(exposesAudio?["dyHear","thHear"]:[])]){
       document.getElementById(id)?.addEventListener("click",()=>{if(!run.locked){flowHelp();update()}},true);
@@ -810,6 +813,10 @@
       +'<div class="dy-progress" role="progressbar" aria-label="本轮学习进度" aria-valuemin="0" aria-valuemax="'+total+'" aria-valuenow="'+index+'"><i style="width:'+Math.min(100,index/Math.max(1,total)*100)+'%"></i></div>'
       +(!['quick','verify'].includes(plan)?'<div class="dy-mix" aria-label="新旧词交错练习">'+[['review','复习'],['consolidate','巩固'],['new','新词']].map(([k,n])=>'<span class="'+((kind==='weak'?'review':kind)===k?'active':'')+'">'+n+' <b>'+counts[k]+'</b></span>').join('')+'</div>':'')
       +'<section class="th-panel th-lesson on dy-card">'+dailyMeta(current())+body+'</section><div class="dy-controls" id="dyControls"></div><div class="dy-foot"><span>'+esc(title)+' · '+esc(seaFor(current()).name)+'</span><button id="dyAudio">声音设置</button></div></div>';
+    const layout=screen.querySelector('.dy-shell'),controls=document.getElementById('dyControls');
+    const scroll=document.createElement('div');scroll.className='dy-scroll';
+    for(const child of [...layout.children])if(!child.classList.contains('dy-header')&&child!==controls)scroll.appendChild(child);
+    layout.insertBefore(scroll,controls);
     document.getElementById('thExit').onclick=()=>window.WORDTIDE_MEMORY.openDaily();
     document.getElementById('dyAudio').onclick=()=>document.getElementById('wtAudioButton')?.click();
   }
@@ -847,12 +854,13 @@
     const hear=document.getElementById('thHear');if(hear)hear.innerHTML=dailyIcon('sound')+'发音';
     const hint=document.getElementById('thCompleteHint');if(hint)hint.innerHTML=dailyIcon('hint')+'提示';
     const btn=document.getElementById('thCompleteCheck')||document.getElementById('thCheck')||document.getElementById('thColoCheck');if(btn)btn.textContent='提交答案';
-    const feedback=document.getElementById('thFeedback');if(feedback)controls.before(feedback);
+    const content=screen.querySelector('.dy-scroll'),foot=screen.querySelector('.dy-foot');
+    const feedback=document.getElementById('thFeedback');if(feedback)content.insertBefore(feedback,foot);
     const answer=quiz.querySelector('.th-answer');
     if(answer){
       const details=document.createElement('details');details.className='dy-explanation';
       const label=document.createElement('summary');label.textContent='查看单词与例句';
-      details.appendChild(label);details.appendChild(answer);controls.before(details);
+      details.appendChild(label);details.appendChild(answer);content.insertBefore(details,foot);
     }
     dailySentenceAudio(it,mode);
   }
