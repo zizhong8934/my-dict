@@ -346,6 +346,9 @@
     document.getElementById('plTone').onclick=()=>{if(window.OCEAN_HOME)OCEAN_HOME.toggle();else{S.themeAppearance=tone==='dark'?'light':'dark';persist()}renderDaily()};
     screen.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>startPlan(b.dataset.plan));
     const rb=document.getElementById('p3Resume');if(rb)rb.onclick=resumeSession;
+    const practice=document.createElement('button');practice.id='plPractice';practice.type='button';practice.textContent='主题海域 · 选择单项练习 →';
+    screen.querySelector('.pl-plans').appendChild(practice);
+    practice.onclick=()=>window.WORDTIDE_THEME.open();
     const bb=document.getElementById('p3Battle');if(bb&&!bb.disabled)bb.onclick=startBattle;
   }
   function openDaily(){renderDaily();showScreen("scDaily");screen.scrollTop=0}

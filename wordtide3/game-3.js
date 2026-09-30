@@ -178,6 +178,7 @@
       if(run!==active||run.i!==index||run.phase!==phase||!active.locked)return;
       active.locked=false;advanceLesson();
     };
+    if(run.daily)flowCorrection();
     // Daily controls stay visible in their scroll container; never move the
     // outer iOS viewport while the keyboard is closing.
     if(!run.daily)requestAnimationFrame(()=>{if(run===active&&active.locked&&btn.isConnected)btn.scrollIntoView({block:'nearest'});});
@@ -185,7 +186,10 @@
   function answerKey(e,check){
     if(e.key!=='Enter'||e.isComposing||e.repeat)return;
     e.preventDefault();
-    if(run?.locked)document.getElementById('thGoOnBtn')?.click();else check();
+    if(run?.locked){
+      if(e.target?.dataset.correction==='editing')document.getElementById('flowRetryInput')?.click();
+      else document.getElementById('thGoOnBtn')?.click();
+    }else check();
   }
   function focusAnswer(input){
     if(!coarse())setTimeout(()=>{if(input.isConnected)input.focus()},50);
@@ -678,6 +682,36 @@
     let i=0;const next=()=>{els.forEach(x=>x.classList.remove("on"));if(i>=chunks.length)return;els[i].classList.add("on");speakAt(chunks[i],Math.max(.55,run.rate-.08));i++;echoTimer=setTimeout(next,Math.max(1050,1500/run.rate))};next()
   }
 
+  // Correction is practice only: never call mark(), requeue(), or recordAnswer().
+  function flowCorrection(){
+    const input=screen.querySelector('#thInput,#thCompleteInput,#thColoInput');
+    const next=document.getElementById('thGoOnBtn');
+    if(!input||!next||document.getElementById('flowRetryInput'))return;
+    const active=run,index=run.i,it=current();
+    const expected=input.id==='thColoInput'?run.colo?.answer:it.w;
+    if(!expected)return;
+    const button=document.createElement('button');button.id='flowRetryInput';button.type='button';button.textContent='再拼一次';
+    const hint=document.getElementById('thCompleteHint');
+    if(hint)hint.replaceWith(button);else next.before(button);
+    const valid=()=>run===active&&run.i===index&&active.locked&&input.isConnected;
+    button.onclick=()=>{
+      if(!valid())return;
+      const fb=document.getElementById('thFeedback');
+      if(input.dataset.correction!=='editing'){
+        input.dataset.correction='editing';input.readOnly=false;input.value='';
+        button.textContent='检查重拼';
+        const explanation=screen.querySelector('.dy-explanation');if(explanation)explanation.open=false;
+        if(fb){fb.className='th-feedback';fb.textContent='再拼一次，不改变首次答题记录，也不计入独立掌握。';}
+        // The visual-viewport helper scrolls only the lesson content on iOS.
+        input.focus();
+      }else{
+        const ok=norm(input.value)===norm(expected);
+        if(fb){fb.className='th-feedback '+(ok?'ok':'bad');fb.textContent=ok?'✓ 重拼正确，可以继续了。':'还不正确，请再试一次；也可以直接继续。';}
+        if(ok){input.readOnly=true;input.dataset.correction='done';input.blur();button.textContent='再拼一次';}
+        else input.focus();
+      }
+    };
+  }
   function flowPosition(){return (run.dailyOffset|0)+run.i}
   function flowAssisted(){return !!(run.helpPosition===flowPosition()||S.dailySession?.learningHelp?.[flowPosition()]||run.pick?.hinted||run.mask?.hints)}
   function flowHelp(){
@@ -773,6 +807,12 @@
     if(a&&!a.correct){
       screen.querySelector(".th-answer")?.classList.add("show");
       const explanation=screen.querySelector(".dy-explanation");if(explanation)explanation.open=true;
+      const active=run,index=run.i;
+      requestAnimationFrame(()=>{
+        const scroll=screen.querySelector('.dy-scroll');
+        if(run!==active||run.i!==index||!run.locked||!screen.classList.contains('on')||!fb?.isConnected||!scroll||screen.querySelector('[data-correction="editing"]'))return;
+        scroll.scrollTop+=fb.getBoundingClientRect().top-scroll.getBoundingClientRect().top-8;
+      });
     }
     const note=document.getElementById("flowHelpNote");
     if(note&&(a?.assisted||a&&!a.correct)){
@@ -817,6 +857,9 @@
     const scroll=document.createElement('div');scroll.className='dy-scroll';
     for(const child of [...layout.children])if(!child.classList.contains('dy-header')&&child!==controls)scroll.appendChild(child);
     layout.insertBefore(scroll,controls);
+    const switcher=document.createElement('button');switcher.id='dySwitchMode';switcher.type='button';switcher.textContent='换模式';
+    screen.querySelector('.dy-heading p').appendChild(switcher);
+    switcher.onclick=()=>{document.activeElement?.blur();window.WORDTIDE_MEMORY.openDaily();document.querySelector('.pl-plans')?.scrollIntoView({block:'start'});};
     document.getElementById('thExit').onclick=()=>window.WORDTIDE_MEMORY.openDaily();
     document.getElementById('dyAudio').onclick=()=>document.getElementById('wtAudioButton')?.click();
   }

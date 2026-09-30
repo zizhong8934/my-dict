@@ -3161,6 +3161,7 @@ function tick(now){
   requestAnimationFrame(tick);
   // 下限也要夹住：时间戳一旦回退（切标签页、系统时钟跳变）会算出负 dt，敌人会倒着飞
   const dt = Math.max(0, Math.min(.05, (now - last) / 1000)); last = now;
+  if(mode!=="play"&&(document.getElementById('scTheme')?.classList.contains('on')||document.getElementById('scDaily')?.classList.contains('on')||document.body.classList.contains('ox-home-visible')))return;
   waveT += dt * 1.1;
   if(damageFlash > 0) damageFlash -= dt;
   drawBg(dt);
