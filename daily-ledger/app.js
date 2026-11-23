@@ -1,7 +1,18 @@
 (()=>{
 'use strict';
 const $=(s,r=document)=>r.querySelector(s),app=$('#app'),fmt=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(+n||0),ym=d=>(d||'').slice(0,7),date=()=>new Date().toLocaleDateString('sv-SE'),id=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6),e=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const seed={version:3,opening:2000,accounts:[['checking','日常账户'],['savings','储蓄账户'],['cash','现金']],categories:[['living','生活费','expense','♨'],['tools','工具费','expense','⌁'],['transport','交通','expense','◆'],['home','居住','expense','⌂'],['study','学习','expense','▤'],['medical','医疗','expense','♥'],['other','其他','expense','•'],['wage','工资','income','▣']].map(x=>({id:x[0],name:x[1],group:x[2],icon:x[3],active:true})),budgets:[{id:'living',name:'生活费',limit:400,rule:'reset',carry:0},{id:'tools',name:'工具费',limit:300,rule:'accumulate',carry:0}],transactions:[['income','wage',1200,'2026-11-19','工资收入','装修工作'],['income','wage',1200,'2026-11-07','工资收入','装修工作'],['expense','living',-48.57,'2026-11-21','超市','Walmart'],['expense','transport',-65,'2026-11-20','车辆保养',''],['expense','tools',-92.8,'2026-11-18','工具采购','Home Depot'],['expense','living',-89,'2026-11-15','日用品',''],['expense','tools',-26.99,'2026-11-12','工具配件','']].map((x,i)=>({id:'t'+i,type:x[0],category:x[1],amount:x[2],date:x[3],title:x[4],merchant:x[5],account:'checking',confirmed:true})).concat([{id:'ts',type:'transfer',category:'saving',amount:200,date:'2026-11-20',title:'转入储蓄',from:'checking',to:'savings',savingImpact:200,note:'工资后存入',confirmed:true,goalId:'g1'}]),goals:[{id:'g1',name:'电钻（工具升级）',emoji:'🛠️',target:800,saved:650,deadline:'2027-01-31',status:'active',image:'',history:[['2026-10-08',100,'allocation','开始储蓄'],['2026-10-25',200,'allocation','阶段存入'],['2026-11-02',50,'allocation','额外存入'],['2026-11-10',100,'allocation','日常结余'],['2026-11-20',200,'transfer','工资后存入']].map((x,i)=>({id:'h'+i,date:x[0],amount:x[1],source:x[2],note:x[3]}))},{id:'g2',name:'升级换车',emoji:'🚙',target:10000,saved:3000,deadline:'2027-12-31',status:'active',image:'',history:[]},{id:'g3',name:'旅行计划',emoji:'✈️',target:1500,saved:0,deadline:'',status:'active',image:'',history:[]}],plans:[],audit:[]};
+function emptyLedger(){
+  const categories=[
+    ['living','生活费','expense','♨'],['tools','工具费','expense','⌁'],['transport','交通','expense','◆'],
+    ['home','居住','expense','⌂'],['study','学习','expense','▤'],['medical','医疗','expense','♥'],
+    ['other','其他','expense','•'],['wage','工资','income','▣'],['otherIncome','其他收入','income','↓']
+  ].map(([id,name,group,icon])=>({id,name,group,icon,active:true}));
+  const start=ym(date());
+  return {version:3,opening:0,accounts:[['checking','日常账户'],['savings','储蓄账户'],['cash','现金']],
+    categories,budgets:[{id:'living',name:'生活费',limit:0,rule:'reset',carry:0,start},
+    {id:'tools',name:'工具费',limit:0,rule:'accumulate',carry:0,start}],
+    transactions:[],goals:[],plans:[],audit:[]};
+}
 let S,V='home',M=ym(date()),F='all',modal='',pick=null,detailId=null;
 const clone=x=>JSON.parse(JSON.stringify(x)),cat=x=>S.categories.find(c=>c.id===x)||{name:'其他',icon:'•'},acct=x=>S.accounts.find(a=>a[0]===x)?.[1]||'未指定';
 function db(){return new Promise((ok,no)=>{let r=indexedDB.open('daily_ledger_v3',1);r.onupgradeneeded=()=>r.result.createObjectStore('state');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
@@ -20,8 +31,8 @@ async function boot(){
   try{
     database=await db();
     const state=await new Promise((ok,no)=>{const q=database.transaction('state').objectStore('state').get('main');q.onsuccess=()=>ok(q.result);q.onerror=()=>no(q.error)});
-    if(state&&state.version!==3)throw Error('version');
-    S=prepare(state||clone(seed)); lastRevision=S.revision||0; render();
+    if(state!==undefined&&state?.version!==3)throw Error('version');
+    S=state===undefined?emptyLedger():prepare(state); lastRevision=S.revision||0; render();
   }catch{app.textContent='账本暂时无法读取。请检查浏览器存储权限后刷新重试。'}
 }
 function save(){
