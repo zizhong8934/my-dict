@@ -26,4 +26,14 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .goal-card .goal-title strong{white-space:nowrap}
 .form-grid>*{min-width:0}.sheet input[type=date]{width:100%;box-sizing:border-box}
 @media(min-width:640px){.goals-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.expense-shortcut,.fixed-link{width:100%;text-align:left;color:inherit}
+.primary.fixed-link{text-align:center}.fixed-link .row-main{flex:1}
+.goal-amounts{display:grid;gap:7px;margin:16px 0}
+.goal-amounts>strong{font-size:clamp(26px,8vw,40px);color:var(--green);line-height:1.12;margin-bottom:8px;overflow-wrap:anywhere}
+.goal-amounts>span,.goal-amounts>div>span,.rule-card p{color:var(--soft)}
+.goal-amounts>div{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}.goal-amounts b{overflow-wrap:anywhere}
+.quick-titles{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.quick-titles button{border:1px solid var(--line);background:#17324c;color:#dbeeff;border-radius:12px;min-height:40px;padding:6px 12px}
+.rule-card{margin-top:10px}.rule-card .section-head{margin:0}.rule-card strong{overflow-wrap:anywhere}
+.sheet .money-input:focus-within{outline:2px solid #87caff;outline-offset:2px}.sheet .money-input input:focus{outline:none}
+
 
