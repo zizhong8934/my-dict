@@ -1,0 +1,10 @@
+{
+  "name": "日常账本",
+  "short_name": "账本",
+  "description": "专注实际收支、工资、预算和心愿储蓄的私人财务账本",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": [{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
